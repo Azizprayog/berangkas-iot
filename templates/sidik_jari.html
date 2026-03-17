@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Kelola Sidik Jari - Admin Brankas</title>
+    <link rel="stylesheet" href="/static/css/sidik_jari.css" />
+  </head>
+  <body>
+    <!-- NAVBAR -->
+    <div class="navbar">
+      <h1>🔐 Admin Brankas</h1>
+      <div class="nav-links">
+        <a href="/">Dashboard</a>
+        <a href="/wajah">Wajah</a>
+        <a href="/sidik_jari" class="active">Sidik Jari</a>
+      </div>
+    </div>
+
+    <div class="container">
+      <!-- HEADER -->
+      <div class="page-header">
+        <div>
+          <h2>
+            👆 Kelola Sidik Jari <span>({{ data|length }} terdaftar)</span>
+          </h2>
+        </div>
+        <button class="btn-add" onclick="bukaModal()">
+          <span class="plus">+</span> Tambah Sidik Jari
+        </button>
+      </div>
+
+      <!-- GRID -->
+      {% if data %}
+      <div class="sidik-grid">
+        {% for item in data %}
+        <div class="sidik-card">
+          <div class="sidik-icon">👆</div>
+          <div class="nama">{{ item.nama }}</div>
+          <div class="finger-id">ID #{{ item.finger_id }}</div>
+          <div class="tanggal">{{ item.created_at[:10] }}</div>
+
+          <form
+            action="/sidik_jari/hapus/{{ item.id }}"
+            method="POST"
+            style="display: inline"
+            onsubmit="return confirm('Hapus sidik jari {{ item.nama }}?')">
+            <button class="btn-hapus" type="submit" title="Hapus">✕</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% else %}
+      <div class="empty-state">
+        <div class="icon">👆</div>
+        <p>
+          Belum ada sidik jari terdaftar.<br />Tekan
+          <strong>+ Tambah Sidik Jari</strong> untuk mulai.
+        </p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- MODAL TAMBAH -->
+    <div class="modal-overlay" id="modal-tambah">
+      <div class="modal">
+        <h3>➕ Tambah Sidik Jari</h3>
+        <form action="/sidik_jari/tambah" method="POST">
+          <label>Nama</label>
+          <input
+            type="text"
+            name="nama"
+            placeholder="Masukkan nama..."
+            required />
+          <label
+            >ID Jari
+            <span style="color: #475569; font-size: 0.75rem"
+              >(dari sensor AS608, angka 1-127)</span
+            ></label
+          >
+          <input
+            type="number"
+            name="finger_id"
+            placeholder="Contoh: 1"
+            min="1"
+            max="127"
+            required />
+          <div class="modal-actions">
+            <button type="button" class="btn-cancel" onclick="tutupModal()">
+              Batal
+            </button>
+            <button type="submit" class="btn-submit">Simpan</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+      function bukaModal() {
+        document.getElementById("modal-tambah").classList.add("active");
+      }
+      function tutupModal() {
+        document.getElementById("modal-tambah").classList.remove("active");
+      }
+      document
+        .getElementById("modal-tambah")
+        .addEventListener("click", function (e) {
+          if (e.target === this) tutupModal();
+        });
+
+      function showToast(msg) {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.classList.add("show");
+        setTimeout(() => t.classList.remove("show"), 3000);
+      }
+
+      var successMsg = "{{ request.args.get('success', '') }}";
+      if (successMsg) showToast(successMsg);
+    </script>
+  </body>
+</html>

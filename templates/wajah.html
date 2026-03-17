@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Kelola Wajah - Admin Brankas</title>
+    <link rel="stylesheet" href="/static/css/wajah.css" />
+  </head>
+  <body>
+    <!-- NAVBAR -->
+    <div class="navbar">
+      <h1>🔐 Admin Brankas</h1>
+      <div class="nav-links">
+        <a href="/">Dashboard</a>
+        <a href="/wajah" class="active">Wajah</a>
+        <a href="/sidik_jari">Sidik Jari</a>
+      </div>
+    </div>
+
+    <div class="container">
+      <!-- HEADER -->
+      <div class="page-header">
+        <div>
+          <h2>
+            👤 Kelola Data Wajah <span>({{ data|length }} terdaftar)</span>
+          </h2>
+        </div>
+        <button class="btn-add" onclick="bukaModal('tambah')">
+          <span class="plus">+</span> Tambah Wajah
+        </button>
+      </div>
+
+      <!-- GRID -->
+      {% if data %}
+      <div class="wajah-grid">
+        {% for item in data %}
+        <div class="wajah-card">
+          {% if item.foto_path %}
+          <img src="/{{ item.foto_path }}" alt="{{ item.nama }}" />
+          {% else %}
+          <div class="placeholder">👤</div>
+          {% endif %}
+
+          <button
+            class="btn-update"
+            title="Update foto"
+            data-id="{{ item.id }}"
+            data-nama="{{ item.nama }}">
+            ✏️
+          </button>
+
+          <form
+            action="/wajah/hapus/{{ item.id }}"
+            method="POST"
+            style="display: inline"
+            onsubmit="return confirm('Hapus wajah {{ item.nama }}?')">
+            <button class="btn-hapus" type="submit" title="Hapus">✕</button>
+          </form>
+
+          <div class="info">
+            <div class="nama">{{ item.nama }}</div>
+            <div class="tanggal">{{ item.created_at[:10] }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% else %}
+      <div class="empty-state">
+        <div class="icon">👤</div>
+        <p>
+          Belum ada wajah terdaftar.<br />Tekan
+          <strong>+ Tambah Wajah</strong> untuk mulai.
+        </p>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- MODAL TAMBAH -->
+    <div class="modal-overlay" id="modal-tambah">
+      <div class="modal">
+        <h3>➕ Tambah Wajah Baru</h3>
+        <form
+          action="/wajah/tambah"
+          method="POST"
+          enctype="multipart/form-data">
+          <label>Nama</label>
+          <input
+            type="text"
+            name="nama"
+            placeholder="Masukkan nama..."
+            required />
+
+          <label>Foto Wajah</label>
+          <div class="sumber-btn-group">
+            <button
+              type="button"
+              id="btn-kamera"
+              class="btn-sumber"
+              onclick="bukaKamera()">
+              📷 Kamera
+            </button>
+            <button
+              type="button"
+              id="btn-galeri"
+              class="btn-sumber"
+              onclick="pilihGaleri()">
+              🖼️ Galeri
+            </button>
+          </div>
+
+          <!-- Preview area -->
+          <div class="upload-area" id="upload-tambah" style="display: none">
+            <!-- Video stream kamera -->
+            <video
+              id="video-kamera"
+              autoplay
+              playsinline
+              style="width: 100%; border-radius: 8px; display: none"></video>
+            <!-- Canvas untuk capture -->
+            <canvas id="canvas-capture" style="display: none"></canvas>
+            <!-- Preview hasil -->
+            <img class="preview" id="preview-tambah" style="display: none" />
+            <div class="upload-icon" id="icon-tambah">📷</div>
+            <p id="text-tambah">Siap</p>
+          </div>
+
+          <!-- Tombol capture (muncul saat kamera aktif) -->
+          <button
+            type="button"
+            id="btn-capture"
+            onclick="ambilFoto()"
+            style="
+              display: none;
+              width: 100%;
+              padding: 0.6rem;
+              background: #22c55e;
+              color: white;
+              border: none;
+              border-radius: 8px;
+              cursor: pointer;
+              font-size: 0.9rem;
+              margin-bottom: 0.75rem;
+            ">
+            📸 Ambil Foto
+          </button>
+          <!-- Tombol retake (muncul setelah capture) -->
+          <button
+            type="button"
+            id="btn-retake"
+            onclick="ulangiKamera()"
+            style="
+              display: none;
+              width: 100%;
+              padding: 0.6rem;
+              background: #f59e0b;
+              color: white;
+              border: none;
+              border-radius: 8px;
+              cursor: pointer;
+              font-size: 0.9rem;
+              margin-bottom: 0.75rem;
+            ">
+            🔄 Ulangi
+          </button>
+
+          <!-- Input file tersembunyi untuk galeri -->
+          <input
+            type="file"
+            name="foto"
+            id="input-foto-tambah"
+            accept="image/*"
+            style="display: none"
+            onchange="previewFoto(this, 'preview-tambah', 'upload-tambah')" />
+          <!-- Input hidden untuk foto dari kamera (base64 → akan dikonversi) -->
+          <input type="hidden" name="foto_base64" id="foto-base64" />
+
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="btn-cancel"
+              onclick="tutupModalTambah()">
+              Batal
+            </button>
+            <button
+              type="submit"
+              class="btn-submit"
+              id="btn-simpan-tambah"
+              disabled>
+              Simpan
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL UPDATE -->
+    <div class="modal-overlay" id="modal-update">
+      <div class="modal">
+        <h3>✏️ Update Foto Wajah</h3>
+        <form
+          id="form-update"
+          action=""
+          method="POST"
+          enctype="multipart/form-data">
+          <label>Nama</label>
+          <input type="text" id="update-nama" name="nama" required />
+
+          <label
+            >Foto Baru
+            <span style="color: #64748b; font-size: 0.75rem"
+              >(foto lama akan diganti)</span
+            ></label
+          >
+          <div class="upload-area" id="upload-update">
+            <input
+              type="file"
+              name="foto"
+              accept="image/*"
+              onchange="previewFoto(this, 'preview-update', 'upload-update')" />
+            <img class="preview" id="preview-update" />
+            <div class="upload-icon" id="icon-update">📷</div>
+            <p id="text-update">Klik untuk pilih foto baru</p>
+          </div>
+
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="btn-cancel"
+              onclick="tutupModal('update')">
+              Batal
+            </button>
+            <button type="submit" class="btn-submit">Update</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+      let streamKamera = null;
+      let fotoBlob = null;
+
+      function bukaModal(id) {
+        document.getElementById("modal-" + id).classList.add("active");
+      }
+
+      function tutupModal(id) {
+        document.getElementById("modal-" + id).classList.remove("active");
+      }
+
+      function tutupModalTambah() {
+        hentikanKamera();
+        resetFormTambah();
+        tutupModal("tambah");
+      }
+
+      document.querySelectorAll(".modal-overlay").forEach((overlay) => {
+        overlay.addEventListener("click", function (e) {
+          if (e.target === this) {
+            hentikanKamera();
+            resetFormTambah();
+            this.classList.remove("active");
+          }
+        });
+      });
+
+      function bukaModalUpdate(id, nama) {
+        document.getElementById("form-update").action = "/wajah/update/" + id;
+        document.getElementById("update-nama").value = nama;
+        bukaModal("update");
+      }
+
+      document.querySelectorAll(".btn-update").forEach((btn) => {
+        btn.addEventListener("click", function () {
+          bukaModalUpdate(this.dataset.id, this.dataset.nama);
+        });
+      });
+
+      // ── KAMERA (WebRTC) ──────────────────────────────
+      async function bukaKamera() {
+        const btnK = document.getElementById("btn-kamera");
+        const btnG = document.getElementById("btn-galeri");
+        btnK.classList.add("sumber-aktif");
+        btnG.classList.remove("sumber-aktif");
+
+        const area = document.getElementById("upload-tambah");
+        area.style.display = "block";
+
+        try {
+          streamKamera = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+          const video = document.getElementById("video-kamera");
+          video.srcObject = streamKamera;
+          video.style.display = "block";
+
+          document.getElementById("icon-tambah").style.display = "none";
+          document.getElementById("text-tambah").style.display = "none";
+          document.getElementById("preview-tambah").style.display = "none";
+          document.getElementById("btn-capture").style.display = "block";
+          document.getElementById("btn-retake").style.display = "none";
+          document.getElementById("btn-simpan-tambah").disabled = true;
+          document.getElementById("btn-simpan-tambah").style.opacity = "0.5";
+          document.getElementById("foto-base64").value = "";
+        } catch (err) {
+          alert("Tidak bisa akses kamera: " + err.message);
+        }
+      }
+
+      function ambilFoto() {
+        const video = document.getElementById("video-kamera");
+        const canvas = document.getElementById("canvas-capture");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext("2d").drawImage(video, 0, 0);
+
+        // Simpan ke preview
+        const dataUrl = canvas.toDataURL("image/jpeg");
+        document.getElementById("foto-base64").value = dataUrl;
+
+        const preview = document.getElementById("preview-tambah");
+        preview.src = dataUrl;
+        preview.style.display = "block";
+        video.style.display = "none";
+
+        document.getElementById("btn-capture").style.display = "none";
+        document.getElementById("btn-retake").style.display = "block";
+
+        // Aktifkan simpan
+        const btnSimpan = document.getElementById("btn-simpan-tambah");
+        btnSimpan.disabled = false;
+        btnSimpan.style.opacity = "1";
+
+        hentikanKamera();
+      }
+
+      function ulangiKamera() {
+        document.getElementById("foto-base64").value = "";
+        document.getElementById("preview-tambah").style.display = "none";
+        document.getElementById("btn-retake").style.display = "none";
+        document.getElementById("btn-simpan-tambah").disabled = true;
+        document.getElementById("btn-simpan-tambah").style.opacity = "0.5";
+        bukaKamera();
+      }
+
+      function hentikanKamera() {
+        if (streamKamera) {
+          streamKamera.getTracks().forEach((t) => t.stop());
+          streamKamera = null;
+        }
+        const video = document.getElementById("video-kamera");
+        if (video) video.style.display = "none";
+        document.getElementById("btn-capture").style.display = "none";
+        document.getElementById("btn-retake").style.display = "none";
+      }
+
+      // ── GALERI ───────────────────────────────────────
+      function pilihGaleri() {
+        hentikanKamera();
+        const btnK = document.getElementById("btn-kamera");
+        const btnG = document.getElementById("btn-galeri");
+        btnK.classList.remove("sumber-aktif");
+        btnG.classList.add("sumber-aktif");
+
+        document.getElementById("upload-tambah").style.display = "block";
+        document.getElementById("icon-tambah").style.display = "block";
+        document.getElementById("text-tambah").style.display = "block";
+        document.getElementById("text-tambah").textContent =
+          "Klik untuk pilih dari galeri";
+        document.getElementById("video-kamera").style.display = "none";
+        document.getElementById("btn-capture").style.display = "none";
+        document.getElementById("btn-retake").style.display = "none";
+        document.getElementById("preview-tambah").style.display = "none";
+        document.getElementById("foto-base64").value = "";
+
+        document.getElementById("input-foto-tambah").click();
+      }
+
+      function resetFormTambah() {
+        document.getElementById("btn-kamera").classList.remove("sumber-aktif");
+        document.getElementById("btn-galeri").classList.remove("sumber-aktif");
+        document.getElementById("upload-tambah").style.display = "none";
+        document.getElementById("icon-tambah").style.display = "block";
+        document.getElementById("text-tambah").style.display = "block";
+        document.getElementById("text-tambah").textContent = "Siap";
+        document.getElementById("preview-tambah").style.display = "none";
+        document.getElementById("foto-base64").value = "";
+        document.getElementById("btn-simpan-tambah").disabled = true;
+        document.getElementById("btn-simpan-tambah").style.opacity = "0.5";
+      }
+
+      // ── PREVIEW GALERI ───────────────────────────────
+      function previewFoto(input, previewId, areaId) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const preview = document.getElementById(previewId);
+          preview.src = e.target.result;
+          preview.style.display = "block";
+          document.getElementById("icon-tambah").style.display = "none";
+          document.getElementById("text-tambah").textContent = file.name;
+
+          const btnSimpan = document.getElementById("btn-simpan-tambah");
+          if (btnSimpan) {
+            btnSimpan.disabled = false;
+            btnSimpan.style.opacity = "1";
+            btnSimpan.style.cursor = "pointer";
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // ── TOAST ────────────────────────────────────────
+      function showToast(msg) {
+        const t = document.getElementById("toast");
+        t.textContent = msg;
+        t.classList.add("show");
+        setTimeout(() => t.classList.remove("show"), 3000);
+      }
+
+      var successMsg = "{{ request.args.get('success', '') }}";
+      if (successMsg) showToast(successMsg);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,283 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: sans-serif;
+  background: #0f172a;
+  color: #f1f5f9;
+  min-height: 100vh;
+}
+
+/* Hilangkan spinner input number */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* NAVBAR */
+.navbar {
+  background: #1e293b;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #334155;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  padding-bottom: 4px;
+}
+
+.nav-links a {
+  color: #94a3b8;
+  text-decoration: none;
+  margin-left: 1.5rem;
+  font-size: 0.9rem;
+  padding-bottom: 4px;
+  position: relative;
+}
+
+.nav-links a:hover {
+  color: #f1f5f9;
+}
+
+.nav-links a.active {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+
+.nav-links a.active::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: #3b82f6;
+  border-radius: 99px;
+  box-shadow:
+    0 0 8px #3b82f6,
+    0 0 20px #3b82f6aa;
+}
+
+/* CONTAINER & GRID */
+.container {
+  padding: 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+/* CARD */
+.card {
+  background: #1e293b;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid #334155;
+}
+.card-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.75rem;
+}
+
+/* STATUS BADGE */
+.status-badge {
+  display: inline-block;
+  padding: 0.4rem 1rem;
+  border-radius: 99px;
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+.status-terbuka {
+  background: #dcfce7;
+  color: #166534;
+}
+.status-tertutup {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.status-unknown {
+  background: #1e293b;
+  color: #64748b;
+  border: 1px solid #334155;
+}
+
+/* BUTTONS */
+.btn {
+  padding: 0.6rem 1.4rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+.btn-green {
+  background: #22c55e;
+  color: white;
+}
+.btn-red {
+  background: #ef4444;
+  color: white;
+}
+.btn-blue {
+  background: #3b82f6;
+  color: white;
+}
+.btn:hover {
+  opacity: 0.85;
+}
+
+.btn-group {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn-nav {
+  display: block;
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: left;
+  margin-bottom: 0.5rem;
+  text-decoration: none;
+}
+.btn-nav:last-child {
+  margin-bottom: 0;
+}
+
+.btn-retensi {
+  padding: 0.35rem 0.85rem;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: all 0.15s;
+}
+.btn-retensi:hover {
+  border-color: #3b82f6;
+  color: #f1f5f9;
+}
+.btn-retensi.aktif {
+  background: #1d4ed8;
+  color: white;
+  border-color: #3b82f6;
+}
+
+/* LOG */
+.log-card {
+  background: #1e293b;
+  border-radius: 12px;
+  border: 1px solid #334155;
+  overflow: hidden;
+}
+.log-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #334155;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.log-header h2 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.log-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.log-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid #0f172a;
+  font-size: 0.85rem;
+}
+.log-item:last-child {
+  border-bottom: none;
+}
+
+.log-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+.log-icon.unlock {
+  background: #dcfce7;
+}
+.log-icon.lock {
+  background: #fee2e2;
+}
+.log-icon.face {
+  background: #dbeafe;
+}
+.log-icon.denied {
+  background: #fef3c7;
+}
+
+.log-event {
+  flex: 1;
+  color: #cbd5e1;
+}
+.log-time {
+  color: #475569;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.log-empty {
+  padding: 2rem;
+  text-align: center;
+  color: #475569;
+  font-size: 0.85rem;
+}
+
+/* DOT */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+.dot-green {
+  background: #22c55e;
+}
+.dot-red {
+  background: #ef4444;
+}
+.dot-gray {
+  background: #475569;
+}

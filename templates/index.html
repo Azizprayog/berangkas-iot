@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Brankas</title>
+  <link rel="stylesheet" href="/static/css/index.css">
+</head>
+<body>
+  <div class="navbar">
+  <h1>🔐 Admin Brankas</h1>
+    <div class="nav-links">
+      <a href="/" class="active">Dashboard</a>
+      <a href="/wajah">Wajah</a>
+      <a href="/sidik_jari">Sidik Jari</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <div style="margin-bottom: 1.5rem;">
+      <h2 style="font-size: 1.4rem; font-weight: 600; color: #f1f5f9;">Dashboard</h2>
+      <p style="font-size: 0.85rem; color: #94a3b8; margin-top: 0.25rem;">Selamat datang di Admin Brankas</p>
+    </div>
+  <div class="grid">
+
+      <!-- Status Brankas -->
+      <div class="card">
+        <div class="card-label">Status Brankas</div>
+        <div id="status-badge" class="status-badge status-unknown">
+          <span class="dot dot-gray"></span> Tidak Diketahui
+        </div>
+        <p style="font-size:0.8rem; color:#475569; margin-top:0.25rem;">Update otomatis via MQTT</p>
+      </div>
+
+      <!-- Kontrol Kunci -->
+      <div class="card">
+        <div class="card-label">Kontrol Kunci</div>
+        <p style="color:#64748b; font-size:0.85rem; margin-bottom:1rem;">Kirim perintah ke brankas via MQTT</p>
+        <div class="btn-group">
+          <form action="/kunci/UNLOCK" method="POST">
+            <button class="btn btn-green" type="submit">🔓 Buka Kunci</button>
+          </form>
+          <form action="/kunci/LOCK" method="POST">
+            <button class="btn btn-red" type="submit">🔒 Kunci</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Manajemen Data -->
+      <div class="card">
+        <div class="card-label">Manajemen Data</div>
+        <a href="/wajah" class="btn-nav btn-blue">👤 Kelola Data Wajah</a>
+        <a href="/sidik_jari" class="btn-nav btn-blue">👆 Kelola Sidik Jari</a>
+      </div>
+
+    </div>
+
+  <!-- Log Aktivitas -->
+<div class="log-card">
+  <div class="log-header">
+    <h2>📋 Log Aktivitas</h2>
+    <div style="display:flex; gap:0.75rem; align-items:center;">
+      <button onclick="toggleSettings()"
+        style="background:none; border:none; color:#94a3b8; cursor:pointer; font-size:0.82rem;">
+        ⚙️ Pengaturan
+      </button>
+      <button onclick="muatLog()"
+        style="background:none; border:none; color:#3b82f6; cursor:pointer; font-size:0.82rem;">
+        ↻ Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Panel Pengaturan Retensi -->
+  <div id="panel-settings" style="display:none; padding:1rem 1.5rem; border-bottom:1px solid #334155; background:#0f172a;">
+    <p style="font-size:0.82rem; color:#94a3b8; margin-bottom:0.75rem;">
+      Log akan otomatis dihapus setelah:
+    </p>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-bottom:1rem;">
+      <button onclick="setRetensi(7)"   class="btn-retensi" data-hari="7">7 Hari</button>
+      <button onclick="setRetensi(14)"  class="btn-retensi" data-hari="14">2 Minggu</button>
+      <button onclick="setRetensi(30)"  class="btn-retensi" data-hari="30">1 Bulan</button>
+      <button onclick="setRetensi(90)"  class="btn-retensi" data-hari="90">3 Bulan</button>
+      <button onclick="setRetensi(180)" class="btn-retensi" data-hari="180">6 Bulan</button>
+      <button onclick="setRetensi(365)" class="btn-retensi" data-hari="365">1 Tahun</button>
+    </div>
+    <div style="display:flex; align-items:center; gap:0.75rem; margin-bottom:0.75rem;">
+      <span style="font-size:0.82rem; color:#64748b;">Atau masukkan manual (hari):</span>
+      <input type="number" id="input-retensi-manual" min="1" max="3650"
+        style="width:80px; padding:0.3rem 0.5rem; background:#1e293b; border:1px solid #334155;
+              border-radius:6px; color:#f1f5f9; font-size:0.85rem;">
+      <button onclick="setRetensiManual()"
+        style="padding:0.3rem 0.75rem; background:#3b82f6; color:white; border:none;
+              border-radius:6px; cursor:pointer; font-size:0.82rem;">
+        Simpan
+      </button>
+    </div>
+    <p id="info-retensi" style="font-size:0.78rem; color:#22c55e; margin-bottom:0.75rem;"></p>
+    <button onclick="konfirmasiHapusSemua()"
+      style="padding:0.4rem 1rem; background:transparent; border:1px solid #ef4444;
+            color:#ef4444; border-radius:6px; cursor:pointer; font-size:0.82rem;">
+      🗑️ Hapus Semua Log Sekarang
+    </button>
+  </div>
+
+  <div class="log-list" id="log-list">
+    <div class="log-empty">Memuat log...</div>
+  </div>
+</div>
+
+  <script>
+    // ── STATUS ────────────────────────────────────
+    function updateStatus() {
+      fetch('/api/status')
+        .then(r => r.json())
+        .then(data => {
+          const badge = document.getElementById('status-badge');
+          const s = data.keadaan;
+          badge.className = 'status-badge';
+          if (s === 'terbuka') {
+            badge.classList.add('status-terbuka');
+            badge.innerHTML = '<span class="dot dot-green"></span> Terbuka';
+          } else if (s === 'tertutup') {
+            badge.classList.add('status-tertutup');
+            badge.innerHTML = '<span class="dot dot-red"></span> Tertutup';
+          } else {
+            badge.classList.add('status-unknown');
+            badge.innerHTML = '<span class="dot dot-gray"></span> Tidak Diketahui';
+          }
+        });
+    }
+
+    // ── LOG ───────────────────────────────────────
+    function getLogIcon(event) {
+      const e = event.toUpperCase();
+      if (e.includes('UNLOCK') && e.includes('FACE')) return { cls: 'face', icon: '👤' };
+      if (e === 'UNLOCK') return { cls: 'unlock', icon: '🔓' };
+      if (e === 'LOCK') return { cls: 'lock', icon: '🔒' };
+      if (e.includes('DENIED')) return { cls: 'denied', icon: '⛔' };
+      return { cls: 'unlock', icon: '📋' };
+    }
+
+    function formatWaktu(ts) {
+      const d = new Date(ts);
+      return d.toLocaleString('id-ID', {
+        day: '2-digit', month: 'short',
+        hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    function muatLog() {
+      fetch('/api/log')
+        .then(r => r.json())
+        .then(logs => {
+          const list = document.getElementById('log-list');
+          if (logs.length === 0) {
+            list.innerHTML = '<div class="log-empty">Belum ada aktivitas.</div>';
+            return;
+          }
+          list.innerHTML = logs.map(log => {
+            const { cls, icon } = getLogIcon(log.event);
+            return `
+              <div class="log-item">
+                <div class="log-icon ${cls}">${icon}</div>
+                <div class="log-event">${log.event}</div>
+                <div class="log-time">${formatWaktu(log.timestamp)}</div>
+              </div>`;
+          }).join('');
+        });
+    }
+
+// ── SETTINGS ─────────────────────────────────────
+let retensiHari = 7;
+
+function toggleSettings() {
+  const panel = document.getElementById('panel-settings');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  if (panel.style.display === 'block') muatSettings();
+}
+
+function muatSettings() {
+  fetch('/api/settings')
+    .then(r => r.json())
+    .then(data => {
+      retensiHari = parseInt(data.log_retensi_hari) || 7;
+      document.getElementById('input-retensi-manual').value = retensiHari;
+      updateTombolRetensi(retensiHari);
+      tampilInfoRetensi(retensiHari);
+    });
+}
+
+function updateTombolRetensi(hari) {
+  document.querySelectorAll('.btn-retensi').forEach(btn => {
+    btn.classList.toggle('aktif', parseInt(btn.dataset.hari) === hari);
+  });
+}
+
+function tampilInfoRetensi(hari) {
+  let label = hari + ' hari';
+  if (hari === 7)   label = '7 hari (1 minggu)';
+  if (hari === 14)  label = '14 hari (2 minggu)';
+  if (hari === 30)  label = '30 hari (1 bulan)';
+  if (hari === 90)  label = '90 hari (3 bulan)';
+  if (hari === 180) label = '180 hari (6 bulan)';
+  if (hari === 365) label = '365 hari (1 tahun)';
+  document.getElementById('info-retensi').textContent = `✓ Log akan disimpan selama ${label}`;
+}
+
+function setRetensi(hari) {
+  fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ log_retensi_hari: String(hari) })
+  }).then(() => {
+    retensiHari = hari;
+    document.getElementById('input-retensi-manual').value = hari;
+    updateTombolRetensi(hari);
+    tampilInfoRetensi(hari);
+  });
+}
+
+function setRetensiManual() {
+  const val = parseInt(document.getElementById('input-retensi-manual').value);
+  if (!val || val < 1) return alert('Masukkan jumlah hari yang valid!');
+  setRetensi(val);
+}
+
+function konfirmasiHapusSemua() {
+  if (!confirm('Yakin hapus SEMUA log aktivitas? Tindakan ini tidak bisa dibatalkan.')) return;
+  fetch('/api/log/hapus-semua', { method: 'POST' })
+    .then(() => {
+      muatLog();
+      alert('Semua log berhasil dihapus!');
+    });
+}
+
+    // Auto refresh setiap 5 detik
+    setInterval(() => {
+      updateStatus();
+      muatLog();
+    }, 5000);
+
+    // Load awal
+    updateStatus();
+    muatLog();
+  </script>
+</body>
+</html>
