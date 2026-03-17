@@ -281,3 +281,72 @@ input[type="number"] {
 .dot-gray {
   background: #475569;
 }
+
+/* ── RESPONSIVE ────────────────────────────────── */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0.75rem 1rem;
+  }
+  .navbar h1 {
+    font-size: 1rem;
+  }
+  .nav-links a {
+    margin-left: 1rem;
+    font-size: 0.82rem;
+  }
+
+  .container {
+    padding: 1rem;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .btn-group {
+    flex-direction: column;
+  }
+  .btn-group form,
+  .btn-group .btn {
+    width: 100%;
+  }
+  .btn-group button {
+    width: 100%;
+  }
+
+  .btn-nav {
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+  }
+
+  .log-header {
+    padding: 0.75rem 1rem;
+  }
+  .log-item {
+    padding: 0.65rem 1rem;
+  }
+
+  .btn-retensi {
+    padding: 0.4rem 0.7rem;
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar h1 {
+    font-size: 0.9rem;
+  }
+  .nav-links a {
+    margin-left: 0.75rem;
+    font-size: 0.78rem;
+  }
+
+  .status-badge {
+    font-size: 0.9rem;
+  }
+
+  .log-time {
+    display: none;
+  }
+}

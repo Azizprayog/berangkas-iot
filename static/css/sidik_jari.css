@@ -309,3 +309,62 @@ input[type="number"] {
   opacity: 1;
   transform: translateY(0);
 }
+
+/* ── RESPONSIVE ────────────────────────────────── */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0.75rem 1rem;
+  }
+  .navbar h1 {
+    font-size: 1rem;
+  }
+  .nav-links a {
+    margin-left: 1rem;
+    font-size: 0.82rem;
+  }
+
+  .container {
+    padding: 1rem;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  .btn-add {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .sidik-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .modal {
+    margin: 1rem;
+    padding: 1.5rem;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar h1 { font-size: 0.9rem; }
+  .nav-links a {
+    margin-left: 0.75rem;
+    font-size: 0.78rem;
+  }
+
+  .sidik-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+  .btn-cancel,
+  .btn-submit {
+    width: 100%;
+  }
+}
