@@ -25,7 +25,9 @@ def kontrol_kunci(aksi):
         db = get_db()
         db.execute("INSERT INTO log_brankas (event) VALUES (?)", (aksi,))
         db.commit()
-    return redirect(url_for("index"))
+        # FIX: return JSON bukan redirect supaya halaman tidak reload
+        return jsonify({"status": "ok", "aksi": aksi})
+    return jsonify({"status": "error", "message": "Aksi tidak valid"}), 400
 
 
 # ─── MANAJEMEN WAJAH ─────────────────────────────────────
@@ -205,4 +207,4 @@ t.start()
 if __name__ == "__main__":
     init_db()
     start_mqtt()
-    app.run(debug=True, host="0.0.0.0", port=5000, use_reloader=False)
+    app.run(debug=False, host="0.0.0.0", port=5000)

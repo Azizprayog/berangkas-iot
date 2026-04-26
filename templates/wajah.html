@@ -2,428 +2,420 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kelola Wajah - Admin Brankas</title>
-    <link rel="stylesheet" href="/static/css/wajah.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Berangkas IoT — Manajemen Wajah</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/Dashboard.css') }}" />
   </head>
   <body>
-    <!-- NAVBAR -->
-    <div class="navbar">
-      <h1>🔐 Admin Brankas</h1>
-      <div class="nav-links">
-        <a href="/">Dashboard</a>
-        <a href="/wajah" class="active">Wajah</a>
-        <a href="/sidik_jari">Sidik Jari</a>
+    <!-- ── SIDEBAR ───────────────────────────────────── -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <a href="/" class="brand-logo">
+          <div class="brand-icon">🔐</div>
+          <div class="brand-text">
+            <span class="brand-name">Berangkas</span>
+            <span class="brand-sub">IoT Security</span>
+          </div>
+        </a>
       </div>
-    </div>
-
-    <div class="container">
-      <!-- HEADER -->
-      <div class="page-header">
-        <div>
-          <h2>
-            👤 Kelola Data Wajah <span>({{ data|length }} terdaftar)</span>
-          </h2>
-        </div>
-        <button class="btn-add" onclick="bukaModal('tambah')">
-          <span class="plus">+</span> Tambah Wajah
-        </button>
-      </div>
-
-      <!-- GRID -->
-      {% if data %}
-      <div class="wajah-grid">
-        {% for item in data %}
-        <div class="wajah-card">
-          {% if item.foto_path %}
-          <img src="/{{ item.foto_path }}" alt="{{ item.nama }}" />
-          {% else %}
-          <div class="placeholder">👤</div>
-          {% endif %}
-
-          <button
-            class="btn-update"
-            title="Update foto"
-            data-id="{{ item.id }}"
-            data-nama="{{ item.nama }}">
-            ✏️
-          </button>
-
-          <form
-            action="/wajah/hapus/{{ item.id }}"
-            method="POST"
-            style="display: inline"
-            onsubmit="return confirm('Hapus wajah {{ item.nama }}?')">
-            <button class="btn-hapus" type="submit" title="Hapus">✕</button>
-          </form>
-
-          <div class="info">
-            <div class="nama">{{ item.nama }}</div>
-            <div class="tanggal">{{ item.created_at[:10] }}</div>
+      <nav class="sidebar-nav">
+        <span class="nav-label">Menu Utama</span>
+        <a href="/" class="nav-item"
+          ><span class="nav-icon">🏠</span> Dashboard</a
+        >
+        <a href="/wajah" class="nav-item active"
+          ><span class="nav-icon">👤</span> Manajemen Wajah</a
+        >
+        <a href="/sidik_jari" class="nav-item"
+          ><span class="nav-icon">🖐️</span> Sidik Jari</a
+        >
+        <span class="nav-label">Monitoring</span>
+        <a href="/#log-section" class="nav-item"
+          ><span class="nav-icon">📋</span> Log Aktivitas</a
+        >
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-status">
+          <div class="status-dot"></div>
+          <div class="status-info">
+            <div class="status-label">MQTT Status</div>
+            <div class="status-value">Terhubung</div>
           </div>
         </div>
-        {% endfor %}
       </div>
+    </aside>
 
-      {% else %}
-      <div class="empty-state">
-        <div class="icon">👤</div>
-        <p>
-          Belum ada wajah terdaftar.<br />Tekan
-          <strong>+ Tambah Wajah</strong> untuk mulai.
-        </p>
-      </div>
-      {% endif %}
-    </div>
-
-    <!-- MODAL TAMBAH -->
-    <div class="modal-overlay" id="modal-tambah">
-      <div class="modal">
-        <h3>➕ Tambah Wajah Baru</h3>
-        <form
-          action="/wajah/tambah"
-          method="POST"
-          enctype="multipart/form-data">
-          <label>Nama</label>
+    <!-- ── MAIN ──────────────────────────────────────── -->
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-search">
+          <span class="search-icon">🔍</span>
           <input
             type="text"
-            name="nama"
-            placeholder="Masukkan nama..."
-            required />
+            placeholder="Cari wajah..."
+            id="search-input"
+            oninput="filterFaces(this.value)" />
+        </div>
+        <div class="topbar-center">
+          <div class="topbar-date" id="topbar-date"></div>
+        </div>
+        <div class="topbar-actions">
+          <a href="/" class="topbar-btn" title="Dashboard">🏠</a>
+          <div class="topbar-avatar">AZ</div>
+        </div>
+      </header>
 
-          <label>Foto Wajah</label>
-          <div class="sumber-btn-group">
-            <button
-              type="button"
-              id="btn-kamera"
-              class="btn-sumber"
-              onclick="bukaKamera()">
-              📷 Kamera
-            </button>
-            <button
-              type="button"
-              id="btn-galeri"
-              class="btn-sumber"
-              onclick="pilihGaleri()">
-              🖼️ Galeri
-            </button>
+      <div class="content">
+        {% if request.args.get('success') %}
+        <div class="alert alert-success">
+          ✅ {{ request.args.get('success') }}
+        </div>
+        {% endif %}
+
+        <div class="section-header">
+          <div>
+            <div class="page-title">👤 Manajemen Wajah</div>
+            <div class="page-sub">
+              Daftarkan dan kelola wajah yang diizinkan membuka brankas.
+            </div>
           </div>
-
-          <!-- Preview area -->
-          <div class="upload-area" id="upload-tambah" style="display: none">
-            <!-- Video stream kamera -->
-            <video
-              id="video-kamera"
-              autoplay
-              playsinline
-              style="width: 100%; border-radius: 8px; display: none"></video>
-            <!-- Canvas untuk capture -->
-            <canvas id="canvas-capture" style="display: none"></canvas>
-            <!-- Preview hasil -->
-            <img class="preview" id="preview-tambah" style="display: none" />
-            <div class="upload-icon" id="icon-tambah">📷</div>
-            <p id="text-tambah">Siap</p>
-          </div>
-
-          <!-- Tombol capture (muncul saat kamera aktif) -->
-          <button
-            type="button"
-            id="btn-capture"
-            onclick="ambilFoto()"
-            style="
-              display: none;
-              width: 100%;
-              padding: 0.6rem;
-              background: #22c55e;
-              color: white;
-              border: none;
-              border-radius: 8px;
-              cursor: pointer;
-              font-size: 0.9rem;
-              margin-bottom: 0.75rem;
-            ">
-            📸 Ambil Foto
+          <button class="btn btn-primary" onclick="openModal('tambah-modal')">
+            ➕ Tambah Wajah
           </button>
-          <!-- Tombol retake (muncul setelah capture) -->
-          <button
-            type="button"
-            id="btn-retake"
-            onclick="ulangiKamera()"
-            style="
-              display: none;
-              width: 100%;
-              padding: 0.6rem;
-              background: #f59e0b;
-              color: white;
-              border: none;
-              border-radius: 8px;
-              cursor: pointer;
-              font-size: 0.9rem;
-              margin-bottom: 0.75rem;
-            ">
-            🔄 Ulangi
-          </button>
+        </div>
 
-          <!-- Input file tersembunyi untuk galeri -->
-          <input
-            type="file"
-            name="foto"
-            id="input-foto-tambah"
-            accept="image/*"
-            style="display: none"
-            onchange="previewFoto(this, 'preview-tambah', 'upload-tambah')" />
-          <!-- Input hidden untuk foto dari kamera (base64 → akan dikonversi) -->
-          <input type="hidden" name="foto_base64" id="foto-base64" />
-
-          <div class="modal-actions">
-            <button
-              type="button"
-              class="btn-cancel"
-              onclick="tutupModalTambah()">
-              Batal
-            </button>
-            <button
-              type="submit"
-              class="btn-submit"
-              id="btn-simpan-tambah"
-              disabled>
-              Simpan
-            </button>
+        <!-- Stats bar -->
+        <div style="display: flex; gap: 10px; margin-bottom: 20px">
+          <div class="chip chip-primary">
+            👤 {{ data|length }} wajah terdaftar
           </div>
-        </form>
+        </div>
+
+        <!-- Face Grid -->
+        {% if data %}
+        <div class="face-grid" id="face-grid">
+          {% for w in data %}
+          <div class="face-card" data-name="{{ w.nama|lower }}">
+            <div class="face-photo">
+              {% if w.foto_path %}
+              <img
+                src="/{{ w.foto_path }}"
+                alt="{{ w.nama }}"
+                onerror="
+                  this.parentElement.innerHTML =
+                    '<div class=\'face-photo-placeholder\'>👤</div>'
+                " />
+              {% else %}
+              <div class="face-photo-placeholder">👤</div>
+              {% endif %}
+            </div>
+            <div class="face-info">
+              <div class="face-name">{{ w.nama }}</div>
+              <div class="face-actions">
+                <button
+                  class="btn btn-sm btn-outline btn-icon"
+                  onclick="openEditModal({{ w.id }}, {{ w.nama|tojson }})"
+                  title="Edit">
+                  ✏️
+                </button>
+                <button
+                  class="btn btn-sm btn-danger btn-icon"
+                  onclick="confirmDelete({{ w.id }}, {{ w.nama|tojson }})"
+                  title="Hapus">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% else %}
+        <div class="face-empty-add" onclick="openModal('tambah-modal')">
+          <div style="font-size: 48px; margin-bottom: 12px">👤</div>
+          <div
+            style="
+              font-size: 15px;
+              font-weight: 700;
+              color: var(--text-secondary);
+              margin-bottom: 6px;
+            ">
+            Belum ada wajah terdaftar
+          </div>
+          <div style="font-size: 13px; color: var(--text-muted)">
+            Klik di sini untuk mendaftarkan wajah pertama
+          </div>
+        </div>
+        {% endif %}
       </div>
-    </div>
+    </main>
 
-    <!-- MODAL UPDATE -->
-    <div class="modal-overlay" id="modal-update">
+    <!-- ── MODAL TAMBAH WAJAH ────────────────────────── -->
+    <div class="modal-overlay" id="tambah-modal">
       <div class="modal">
-        <h3>✏️ Update Foto Wajah</h3>
-        <form
-          id="form-update"
-          action=""
-          method="POST"
-          enctype="multipart/form-data">
-          <label>Nama</label>
-          <input type="text" id="update-nama" name="nama" required />
+        <div class="modal-header">
+          <span class="modal-title">➕ Tambah Wajah Baru</span>
+          <button class="modal-close" onclick="closeModal('tambah-modal')">
+            ✕
+          </button>
+        </div>
+        <div class="modal-body">
+          <form
+            method="POST"
+            action="/wajah/tambah"
+            enctype="multipart/form-data"
+            id="form-tambah">
+            <div class="form-group">
+              <label class="form-label">Nama Pengguna</label>
+              <input
+                type="text"
+                name="nama"
+                class="form-input"
+                placeholder="Masukkan nama..."
+                required />
+            </div>
 
-          <label
-            >Foto Baru
-            <span style="color: #64748b; font-size: 0.75rem"
-              >(foto lama akan diganti)</span
-            ></label
-          >
-          <div class="upload-area" id="upload-update">
-            <input
-              type="file"
-              name="foto"
-              accept="image/*"
-              onchange="previewFoto(this, 'preview-update', 'upload-update')" />
-            <img class="preview" id="preview-update" />
-            <div class="upload-icon" id="icon-update">📷</div>
-            <p id="text-update">Klik untuk pilih foto baru</p>
-          </div>
+            <div class="tab-bar">
+              <button
+                type="button"
+                class="tab-btn active"
+                onclick="switchTab('upload', event)">
+                📁 Upload Foto
+              </button>
+              <button
+                type="button"
+                class="tab-btn"
+                onclick="switchTab('camera', event)">
+                📷 Kamera
+              </button>
+            </div>
 
-          <div class="modal-actions">
-            <button
-              type="button"
-              class="btn-cancel"
-              onclick="tutupModal('update')">
-              Batal
-            </button>
-            <button type="submit" class="btn-submit">Update</button>
-          </div>
-        </form>
+            <div id="tab-upload" class="tab-panel active">
+              <div class="form-group">
+                <label class="form-label">Pilih Foto</label>
+                <input
+                  type="file"
+                  name="foto"
+                  class="form-input"
+                  accept="image/*"
+                  id="file-input" />
+              </div>
+            </div>
+
+            <div id="tab-camera" class="tab-panel">
+              <div
+                class="camera-wrap"
+                style="
+                  border-radius: var(--r-sm);
+                  overflow: hidden;
+                  background: var(--input-bg);
+                ">
+                <video
+                  id="video"
+                  autoplay
+                  playsinline
+                  style="width: 100%; display: none"></video>
+                <div class="camera-placeholder" id="cam-placeholder">
+                  <span class="camera-placeholder-icon">📷</span>
+                  <span class="camera-placeholder-text"
+                    >Klik "Buka Kamera" untuk mulai</span
+                  >
+                </div>
+              </div>
+              <div class="camera-controls">
+                <button
+                  type="button"
+                  class="btn btn-outline btn-sm"
+                  onclick="startCamera()">
+                  📷 Buka Kamera
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  onclick="capturePhoto()">
+                  📸 Ambil Foto
+                </button>
+              </div>
+              <div
+                id="preview-container"
+                style="display: none; margin-top: 10px">
+                <img
+                  id="preview-img"
+                  alt="Preview"
+                  style="
+                    width: 100%;
+                    border-radius: var(--r-sm);
+                    border: 2px solid var(--primary-light);
+                  " />
+              </div>
+              <input type="hidden" name="foto_base64" id="foto_base64" />
+            </div>
+
+            <div class="modal-footer" style="padding: 16px 0 0; margin: 0">
+              <button
+                type="button"
+                class="btn btn-outline"
+                onclick="closeModal('tambah-modal')">
+                Batal
+              </button>
+              <button type="submit" class="btn btn-primary">💾 Simpan</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
 
-    <!-- TOAST -->
-    <div class="toast" id="toast"></div>
+    <!-- ── MODAL EDIT WAJAH ──────────────────────────── -->
+    <div class="modal-overlay" id="edit-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">✏️ Edit Wajah</span>
+          <button class="modal-close" onclick="closeModal('edit-modal')">
+            ✕
+          </button>
+        </div>
+        <div class="modal-body">
+          <form method="POST" id="form-edit" enctype="multipart/form-data">
+            <div class="form-group">
+              <label class="form-label">Nama</label>
+              <input
+                type="text"
+                name="nama"
+                class="form-input"
+                id="edit-nama"
+                required />
+            </div>
+            <div class="form-group">
+              <label class="form-label"
+                >Foto Baru
+                <span style="color: var(--text-muted); font-weight: 400"
+                  >(opsional)</span
+                ></label
+              >
+              <input
+                type="file"
+                name="foto"
+                class="form-input"
+                accept="image/*" />
+            </div>
+            <div class="modal-footer" style="padding: 16px 0 0; margin: 0">
+              <button
+                type="button"
+                class="btn btn-outline"
+                onclick="closeModal('edit-modal')">
+                Batal
+              </button>
+              <button type="submit" class="btn btn-primary">💾 Update</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MODAL HAPUS ───────────────────────────────── -->
+    <div class="modal-overlay" id="hapus-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">⚠️ Konfirmasi Hapus</span>
+          <button class="modal-close" onclick="closeModal('hapus-modal')">
+            ✕
+          </button>
+        </div>
+        <div class="modal-body">
+          <p style="color: var(--text-secondary); font-size: 14px">
+            Hapus wajah <strong id="delete-name"></strong>? Tindakan ini tidak
+            bisa dibatalkan.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeModal('hapus-modal')">
+            Batal
+          </button>
+          <form id="form-hapus" method="POST" style="margin: 0">
+            <button type="submit" class="btn btn-danger">🗑️ Hapus</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast-container"></div>
 
     <script>
-      let streamKamera = null;
-      let fotoBlob = null;
+      const d = new Date();
+      document.getElementById("topbar-date").textContent = d.toLocaleDateString(
+        "id-ID",
+        { weekday: "long", year: "numeric", month: "long", day: "numeric" },
+      );
 
-      function bukaModal(id) {
-        document.getElementById("modal-" + id).classList.add("active");
+      function openModal(id) {
+        document.getElementById(id).classList.add("open");
+      }
+      function closeModal(id) {
+        document.getElementById(id).classList.remove("open");
       }
 
-      function tutupModal(id) {
-        document.getElementById("modal-" + id).classList.remove("active");
+      function openEditModal(id, nama) {
+        document.getElementById("edit-nama").value = nama;
+        document.getElementById("form-edit").action = `/wajah/update/${id}`;
+        openModal("edit-modal");
       }
 
-      function tutupModalTambah() {
-        hentikanKamera();
-        resetFormTambah();
-        tutupModal("tambah");
+      function confirmDelete(id, nama) {
+        document.getElementById("delete-name").textContent = nama;
+        document.getElementById("form-hapus").action = `/wajah/hapus/${id}`;
+        openModal("hapus-modal");
       }
 
-      document.querySelectorAll(".modal-overlay").forEach((overlay) => {
-        overlay.addEventListener("click", function (e) {
-          if (e.target === this) {
-            hentikanKamera();
-            resetFormTambah();
-            this.classList.remove("active");
-          }
+      function switchTab(tab, e) {
+        document
+          .querySelectorAll(".tab-panel")
+          .forEach((p) => p.classList.remove("active"));
+        document
+          .querySelectorAll(".tab-btn")
+          .forEach((b) => b.classList.remove("active"));
+        document.getElementById(`tab-${tab}`).classList.add("active");
+        if (e && e.target) e.target.classList.add("active");
+      }
+
+      function filterFaces(q) {
+        document.querySelectorAll(".face-card").forEach((c) => {
+          c.style.display = c.dataset.name.includes(q.toLowerCase())
+            ? ""
+            : "none";
         });
-      });
-
-      function bukaModalUpdate(id, nama) {
-        document.getElementById("form-update").action = "/wajah/update/" + id;
-        document.getElementById("update-nama").value = nama;
-        bukaModal("update");
       }
 
-      document.querySelectorAll(".btn-update").forEach((btn) => {
-        btn.addEventListener("click", function () {
-          bukaModalUpdate(this.dataset.id, this.dataset.nama);
-        });
-      });
-
-      // ── KAMERA (WebRTC) ──────────────────────────────
-      async function bukaKamera() {
-        const btnK = document.getElementById("btn-kamera");
-        const btnG = document.getElementById("btn-galeri");
-        btnK.classList.add("sumber-aktif");
-        btnG.classList.remove("sumber-aktif");
-
-        const area = document.getElementById("upload-tambah");
-        area.style.display = "block";
-
+      let stream = null;
+      async function startCamera() {
         try {
-          streamKamera = await navigator.mediaDevices.getUserMedia({
-            video: true,
-          });
-          const video = document.getElementById("video-kamera");
-          video.srcObject = streamKamera;
-          video.style.display = "block";
-
-          document.getElementById("icon-tambah").style.display = "none";
-          document.getElementById("text-tambah").style.display = "none";
-          document.getElementById("preview-tambah").style.display = "none";
-          document.getElementById("btn-capture").style.display = "block";
-          document.getElementById("btn-retake").style.display = "none";
-          document.getElementById("btn-simpan-tambah").disabled = true;
-          document.getElementById("btn-simpan-tambah").style.opacity = "0.5";
-          document.getElementById("foto-base64").value = "";
-        } catch (err) {
-          alert("Tidak bisa akses kamera: " + err.message);
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          const vid = document.getElementById("video");
+          vid.srcObject = stream;
+          vid.style.display = "block";
+          document.getElementById("cam-placeholder").style.display = "none";
+        } catch (e) {
+          alert("Gagal membuka kamera: " + e.message);
         }
       }
 
-      function ambilFoto() {
-        const video = document.getElementById("video-kamera");
-        const canvas = document.getElementById("canvas-capture");
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext("2d").drawImage(video, 0, 0);
-
-        // Simpan ke preview
-        const dataUrl = canvas.toDataURL("image/jpeg");
-        document.getElementById("foto-base64").value = dataUrl;
-
-        const preview = document.getElementById("preview-tambah");
-        preview.src = dataUrl;
-        preview.style.display = "block";
-        video.style.display = "none";
-
-        document.getElementById("btn-capture").style.display = "none";
-        document.getElementById("btn-retake").style.display = "block";
-
-        // Aktifkan simpan
-        const btnSimpan = document.getElementById("btn-simpan-tambah");
-        btnSimpan.disabled = false;
-        btnSimpan.style.opacity = "1";
-
-        hentikanKamera();
-      }
-
-      function ulangiKamera() {
-        document.getElementById("foto-base64").value = "";
-        document.getElementById("preview-tambah").style.display = "none";
-        document.getElementById("btn-retake").style.display = "none";
-        document.getElementById("btn-simpan-tambah").disabled = true;
-        document.getElementById("btn-simpan-tambah").style.opacity = "0.5";
-        bukaKamera();
-      }
-
-      function hentikanKamera() {
-        if (streamKamera) {
-          streamKamera.getTracks().forEach((t) => t.stop());
-          streamKamera = null;
+      function capturePhoto() {
+        const vid = document.getElementById("video");
+        if (!vid.srcObject) {
+          alert("Buka kamera dulu!");
+          return;
         }
-        const video = document.getElementById("video-kamera");
-        if (video) video.style.display = "none";
-        document.getElementById("btn-capture").style.display = "none";
-        document.getElementById("btn-retake").style.display = "none";
+        const canvas = document.createElement("canvas");
+        canvas.width = vid.videoWidth;
+        canvas.height = vid.videoHeight;
+        canvas.getContext("2d").drawImage(vid, 0, 0);
+        const b64 = canvas.toDataURL("image/jpeg", 0.9);
+        document.getElementById("foto_base64").value = b64;
+        document.getElementById("preview-img").src = b64;
+        document.getElementById("preview-container").style.display = "block";
+        if (stream) stream.getTracks().forEach((t) => t.stop());
       }
-
-      // ── GALERI ───────────────────────────────────────
-      function pilihGaleri() {
-        hentikanKamera();
-        const btnK = document.getElementById("btn-kamera");
-        const btnG = document.getElementById("btn-galeri");
-        btnK.classList.remove("sumber-aktif");
-        btnG.classList.add("sumber-aktif");
-
-        document.getElementById("upload-tambah").style.display = "block";
-        document.getElementById("icon-tambah").style.display = "block";
-        document.getElementById("text-tambah").style.display = "block";
-        document.getElementById("text-tambah").textContent =
-          "Klik untuk pilih dari galeri";
-        document.getElementById("video-kamera").style.display = "none";
-        document.getElementById("btn-capture").style.display = "none";
-        document.getElementById("btn-retake").style.display = "none";
-        document.getElementById("preview-tambah").style.display = "none";
-        document.getElementById("foto-base64").value = "";
-
-        document.getElementById("input-foto-tambah").click();
-      }
-
-      function resetFormTambah() {
-        document.getElementById("btn-kamera").classList.remove("sumber-aktif");
-        document.getElementById("btn-galeri").classList.remove("sumber-aktif");
-        document.getElementById("upload-tambah").style.display = "none";
-        document.getElementById("icon-tambah").style.display = "block";
-        document.getElementById("text-tambah").style.display = "block";
-        document.getElementById("text-tambah").textContent = "Siap";
-        document.getElementById("preview-tambah").style.display = "none";
-        document.getElementById("foto-base64").value = "";
-        document.getElementById("btn-simpan-tambah").disabled = true;
-        document.getElementById("btn-simpan-tambah").style.opacity = "0.5";
-      }
-
-      // ── PREVIEW GALERI ───────────────────────────────
-      function previewFoto(input, previewId, areaId) {
-        const file = input.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const preview = document.getElementById(previewId);
-          preview.src = e.target.result;
-          preview.style.display = "block";
-          document.getElementById("icon-tambah").style.display = "none";
-          document.getElementById("text-tambah").textContent = file.name;
-
-          const btnSimpan = document.getElementById("btn-simpan-tambah");
-          if (btnSimpan) {
-            btnSimpan.disabled = false;
-            btnSimpan.style.opacity = "1";
-            btnSimpan.style.cursor = "pointer";
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-
-      // ── TOAST ────────────────────────────────────────
-      function showToast(msg) {
-        const t = document.getElementById("toast");
-        t.textContent = msg;
-        t.classList.add("show");
-        setTimeout(() => t.classList.remove("show"), 3000);
-      }
-
-      var successMsg = "{{ request.args.get('success', '') }}";
-      if (successMsg) showToast(successMsg);
     </script>
   </body>
 </html>

@@ -1,13 +1,16 @@
 import sqlite3
 
+
 def get_db():
-    conn = sqlite3.connect('brankas.db')
+    conn = sqlite3.connect("brankas.db")
     conn.row_factory = sqlite3.Row
     return conn
 
+
 def init_db():
     conn = get_db()
-    conn.executescript('''
+    conn.executescript(
+        """
         CREATE TABLE IF NOT EXISTS wajah (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nama TEXT NOT NULL,
@@ -30,6 +33,7 @@ def init_db():
             value TEXT NOT NULL
         );
         INSERT OR IGNORE INTO settings (key, value) VALUES ('log_retensi_hari', '7');
-    ''')
+    """
+    )
     conn.commit()
     conn.close()

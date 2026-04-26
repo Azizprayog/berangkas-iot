@@ -2,125 +2,325 @@
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kelola Sidik Jari - Admin Brankas</title>
-    <link rel="stylesheet" href="/static/css/sidik_jari.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Berangkas IoT — Sidik Jari</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/Dashboard.css') }}" />
   </head>
   <body>
-    <!-- NAVBAR -->
-    <div class="navbar">
-      <h1>🔐 Admin Brankas</h1>
-      <div class="nav-links">
-        <a href="/">Dashboard</a>
-        <a href="/wajah">Wajah</a>
-        <a href="/sidik_jari" class="active">Sidik Jari</a>
+    <!-- ── SIDEBAR ───────────────────────────────────── -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <a href="/" class="brand-logo">
+          <div class="brand-icon">🔐</div>
+          <div class="brand-text">
+            <span class="brand-name">Berangkas</span>
+            <span class="brand-sub">IoT Security</span>
+          </div>
+        </a>
       </div>
-    </div>
-
-    <div class="container">
-      <!-- HEADER -->
-      <div class="page-header">
-        <div>
-          <h2>
-            👆 Kelola Sidik Jari <span>({{ data|length }} terdaftar)</span>
-          </h2>
+      <nav class="sidebar-nav">
+        <span class="nav-label">Menu Utama</span>
+        <a href="/" class="nav-item"
+          ><span class="nav-icon">🏠</span> Dashboard</a
+        >
+        <a href="/wajah" class="nav-item"
+          ><span class="nav-icon">👤</span> Manajemen Wajah</a
+        >
+        <a href="/sidik_jari" class="nav-item active"
+          ><span class="nav-icon">🖐️</span> Sidik Jari</a
+        >
+        <span class="nav-label">Monitoring</span>
+        <a href="/#log-section" class="nav-item"
+          ><span class="nav-icon">📋</span> Log Aktivitas</a
+        >
+      </nav>
+      <div class="sidebar-footer">
+        <div class="sidebar-status">
+          <div class="status-dot"></div>
+          <div class="status-info">
+            <div class="status-label">MQTT Status</div>
+            <div class="status-value">Terhubung</div>
+          </div>
         </div>
-        <button class="btn-add" onclick="bukaModal()">
-          <span class="plus">+</span> Tambah Sidik Jari
-        </button>
       </div>
+    </aside>
 
-      <!-- GRID -->
-      {% if data %}
-      <div class="sidik-grid">
-        {% for item in data %}
-        <div class="sidik-card">
-          <div class="sidik-icon">👆</div>
-          <div class="nama">{{ item.nama }}</div>
-          <div class="finger-id">ID #{{ item.finger_id }}</div>
-          <div class="tanggal">{{ item.created_at[:10] }}</div>
+    <!-- ── MAIN ──────────────────────────────────────── -->
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-search">
+          <span class="search-icon">🔍</span>
+          <input type="text" placeholder="Cari nama..." />
+        </div>
+        <div class="topbar-center">
+          <div class="topbar-date" id="topbar-date"></div>
+        </div>
+        <div class="topbar-actions">
+          <a href="/" class="topbar-btn">🏠</a>
+          <div class="topbar-avatar">AZ</div>
+        </div>
+      </header>
 
-          <form
-            action="/sidik_jari/hapus/{{ item.id }}"
-            method="POST"
-            style="display: inline"
-            onsubmit="return confirm('Hapus sidik jari {{ item.nama }}?')">
-            <button class="btn-hapus" type="submit" title="Hapus">✕</button>
+      <div class="content">
+        {% if request.args.get('success') %}
+        <div class="alert alert-success">
+          ✅ {{ request.args.get('success') }}
+        </div>
+        {% endif %}
+
+        <div class="section-header">
+          <div>
+            <div class="page-title">🖐️ Manajemen Sidik Jari</div>
+            <div class="page-sub">
+              Kelola slot sidik jari yang digunakan untuk membuka brankas.
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="openModal('tambah-modal')">
+            ➕ Daftarkan Sidik Jari
+          </button>
+        </div>
+
+        <!-- Stats -->
+        <div style="display: flex; gap: 10px; margin-bottom: 20px">
+          <div class="chip chip-primary">
+            🖐️ {{ data|length }} sidik jari terdaftar
+          </div>
+          <div class="chip chip-neutral">📦 Maks. 127 slot</div>
+        </div>
+
+        <!-- Slot Visualizer -->
+        <div class="card mb-20">
+          <div class="card-header">
+            <span class="card-title">Slot Sidik Jari (ID 1–10)</span>
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                font-size: 11.5px;
+                color: var(--text-muted);
+              ">
+              <span style="display: flex; align-items: center; gap: 5px">
+                <span
+                  style="
+                    display: inline-block;
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background: var(--accent);
+                  "></span>
+                Terisi
+              </span>
+              <span style="display: flex; align-items: center; gap: 5px">
+                <span
+                  style="
+                    display: inline-block;
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background: var(--border);
+                  "></span>
+                Kosong
+              </span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="finger-slots">
+              {% set used_ids = data | map(attribute='finger_id') | map('int') |
+              list %} {% for i in range(1, 11) %} {% set matched = data |
+              selectattr('finger_id', 'equalto', i | string) | list %}
+              <div
+                class="finger-slot {% if matched %}used{% endif %}"
+                data-slot="{{ i }}"
+                data-used="{{ 'true' if matched else 'false' }}"
+                onclick="handleSlotClick(this)">
+                <span class="slot-num">#{{ i }}</span>
+                <span class="slot-icon"
+                  >{% if matched %}🖐️{% else %}➕{% endif %}</span
+                >
+                {% if matched %}
+                <span class="slot-name">{{ matched[0].nama }}</span>
+                {% else %}
+                <span class="slot-empty-label">Kosong</span>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="section-header" style="margin-bottom: 14px">
+          <span
+            style="
+              font-size: 13.5px;
+              font-weight: 700;
+              color: var(--text-secondary);
+            "
+            >Semua Pendaftaran</span
+          >
+        </div>
+
+        {% if data %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Slot ID</th>
+                <th>Nama</th>
+                <th>Tanggal Daftar</th>
+                <th>Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in data %}
+              <tr>
+                <td>
+                  <span class="chip chip-primary">#{{ s.finger_id }}</span>
+                </td>
+                <td>
+                  <div class="flex-center gap-8">
+                    <div class="avatar">{{ s.nama[0]|upper }}</div>
+                    <span style="font-weight: 600">{{ s.nama }}</span>
+                  </div>
+                </td>
+                <td class="td-secondary">{{ s.created_at }}</td>
+                <td>
+                  <button
+                    class="btn btn-sm btn-danger"
+                    onclick="confirmDelete({{ s.id }}, {{ s.nama|tojson }})">
+                    🗑️ Hapus
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="card">
+          <div class="empty-state">
+            <div class="empty-icon">🖐️</div>
+            <div class="empty-title">Belum ada sidik jari terdaftar</div>
+            <div class="empty-sub">
+              Klik "Daftarkan Sidik Jari" untuk menambahkan
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </main>
+
+    <!-- ── MODAL TAMBAH ──────────────────────────────── -->
+    <div class="modal-overlay" id="tambah-modal">
+      <div class="modal">
+        <div class="modal-header">
+          <span class="modal-title">🖐️ Daftarkan Sidik Jari</span>
+          <button class="modal-close" onclick="closeModal('tambah-modal')">
+            ✕
+          </button>
+        </div>
+        <div class="modal-body">
+          <form method="POST" action="/sidik_jari/tambah">
+            <div class="form-group">
+              <label class="form-label">Nama Pengguna</label>
+              <input
+                type="text"
+                name="nama"
+                class="form-input"
+                placeholder="Contoh: Aziz"
+                required />
+            </div>
+            <div class="form-group">
+              <label class="form-label">ID Slot Sidik Jari</label>
+              <input
+                type="number"
+                name="finger_id"
+                class="form-input"
+                placeholder="1 – 127"
+                min="1"
+                max="127"
+                id="finger-id-input"
+                required />
+              <div
+                style="
+                  font-size: 11.5px;
+                  color: var(--text-muted);
+                  margin-top: 5px;
+                ">
+                Sesuaikan dengan ID yang sudah diprogram di sensor fingerprint.
+              </div>
+            </div>
+            <div class="modal-footer" style="padding: 16px 0 0; margin: 0">
+              <button
+                type="button"
+                class="btn btn-outline"
+                onclick="closeModal('tambah-modal')">
+                Batal
+              </button>
+              <button type="submit" class="btn btn-primary">💾 Simpan</button>
+            </div>
           </form>
         </div>
-        {% endfor %}
       </div>
-
-      {% else %}
-      <div class="empty-state">
-        <div class="icon">👆</div>
-        <p>
-          Belum ada sidik jari terdaftar.<br />Tekan
-          <strong>+ Tambah Sidik Jari</strong> untuk mulai.
-        </p>
-      </div>
-      {% endif %}
     </div>
 
-    <!-- MODAL TAMBAH -->
-    <div class="modal-overlay" id="modal-tambah">
+    <!-- ── MODAL HAPUS ───────────────────────────────── -->
+    <div class="modal-overlay" id="hapus-modal">
       <div class="modal">
-        <h3>➕ Tambah Sidik Jari</h3>
-        <form action="/sidik_jari/tambah" method="POST">
-          <label>Nama</label>
-          <input
-            type="text"
-            name="nama"
-            placeholder="Masukkan nama..."
-            required />
-          <label
-            >ID Jari
-            <span style="color: #475569; font-size: 0.75rem"
-              >(dari sensor AS608, angka 1-127)</span
-            ></label
-          >
-          <input
-            type="number"
-            name="finger_id"
-            placeholder="Contoh: 1"
-            min="1"
-            max="127"
-            required />
-          <div class="modal-actions">
-            <button type="button" class="btn-cancel" onclick="tutupModal()">
-              Batal
-            </button>
-            <button type="submit" class="btn-submit">Simpan</button>
-          </div>
-        </form>
+        <div class="modal-header">
+          <span class="modal-title">⚠️ Konfirmasi Hapus</span>
+          <button class="modal-close" onclick="closeModal('hapus-modal')">
+            ✕
+          </button>
+        </div>
+        <div class="modal-body">
+          <p style="color: var(--text-secondary); font-size: 14px">
+            Hapus sidik jari <strong id="delete-name"></strong> dari daftar?
+            Tindakan ini tidak bisa dibatalkan.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeModal('hapus-modal')">
+            Batal
+          </button>
+          <form id="form-hapus" method="POST" style="margin: 0">
+            <button type="submit" class="btn btn-danger">🗑️ Hapus</button>
+          </form>
+        </div>
       </div>
     </div>
 
-    <!-- TOAST -->
-    <div class="toast" id="toast"></div>
+    <div id="toast-container"></div>
 
     <script>
-      function bukaModal() {
-        document.getElementById("modal-tambah").classList.add("active");
-      }
-      function tutupModal() {
-        document.getElementById("modal-tambah").classList.remove("active");
-      }
-      document
-        .getElementById("modal-tambah")
-        .addEventListener("click", function (e) {
-          if (e.target === this) tutupModal();
-        });
+      const d = new Date();
+      document.getElementById("topbar-date").textContent = d.toLocaleDateString(
+        "id-ID",
+        { weekday: "long", year: "numeric", month: "long", day: "numeric" },
+      );
 
-      function showToast(msg) {
-        const t = document.getElementById("toast");
-        t.textContent = msg;
-        t.classList.add("show");
-        setTimeout(() => t.classList.remove("show"), 3000);
+      function openModal(id) {
+        document.getElementById(id).classList.add("open");
+      }
+      function closeModal(id) {
+        document.getElementById(id).classList.remove("open");
       }
 
-      var successMsg = "{{ request.args.get('success', '') }}";
-      if (successMsg) showToast(successMsg);
+      function confirmDelete(id, nama) {
+        document.getElementById("delete-name").textContent = nama;
+        document.getElementById("form-hapus").action =
+          `/sidik_jari/hapus/${id}`;
+        openModal("hapus-modal");
+      }
+
+      function handleSlotClick(el) {
+        if (el.dataset.used === "true") return;
+        document.getElementById("finger-id-input").value = el.dataset.slot;
+        openModal("tambah-modal");
+      }
     </script>
   </body>
 </html>

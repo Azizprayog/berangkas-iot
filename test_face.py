@@ -6,6 +6,7 @@ PORT = 1883
 TOPIC_CAM_FOTO = "brankas/cam/foto"
 TOPIC_CAM_RESULT = "brankas/cam/result"
 
+
 def on_message(client, userdata, msg):
     if msg.topic == TOPIC_CAM_RESULT:
         result = msg.payload.decode()
@@ -17,9 +18,11 @@ def on_message(client, userdata, msg):
         elif result == "ERROR":
             print("⚠️  ERROR saat proses gambar")
 
+
 def on_connect(client, userdata, flags, rc):
     client.subscribe(TOPIC_CAM_RESULT)
     print("[MQTT] Terhubung, menunggu hasil...")
+
 
 client = mqtt.Client()
 client.on_connect = on_connect
@@ -31,7 +34,7 @@ client.loop_start()
 foto_path = input("Masukkan path foto yang mau ditest: ").strip()
 
 try:
-    with open(foto_path, 'rb') as f:
+    with open(foto_path, "rb") as f:
         image_bytes = f.read()
     print(f"\n[TEST] Mengirim foto: {foto_path}")
     client.publish(TOPIC_CAM_FOTO, image_bytes)

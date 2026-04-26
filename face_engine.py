@@ -4,11 +4,12 @@ import os
 import sqlite3
 import io
 
-DB_PATH = 'brankas.db'
-UPLOAD_FOLDER = 'static/uploads'
+DB_PATH = "brankas.db"
+UPLOAD_FOLDER = "static/uploads"
 
 # Cache
 _cache = {"encodings": None, "names": None}
+
 
 def load_known_faces(force_reload=False):
     if not force_reload and _cache["encodings"] is not None:
@@ -23,7 +24,7 @@ def load_known_faces(force_reload=False):
     conn.close()
 
     for row in rows:
-        path = row['foto_path']
+        path = row["foto_path"]
         if not os.path.exists(path):
             continue
         try:
@@ -31,19 +32,21 @@ def load_known_faces(force_reload=False):
             encodings = face_recognition.face_encodings(img)
             if encodings:
                 known_encodings.append(encodings[0])
-                known_names.append(row['nama'])
+                known_names.append(row["nama"])
                 print(f"[FACE] Loaded: {row['nama']}")
         except Exception as e:
             print(f"[FACE] Error loading {path}: {e}")
 
-    _cache["encodings"] = known_encodings # type: ignore
+    _cache["encodings"] = known_encodings  # type: ignore
     _cache["names"] = known_names  # type: ignore
     return known_encodings, known_names
+
 
 def clear_cache():
     _cache["encodings"] = None
     _cache["names"] = None
     print("[FACE] Cache cleared")
+
 
 def verify_face(image_bytes, tolerance=0.5):
     try:
@@ -61,7 +64,9 @@ def verify_face(image_bytes, tolerance=0.5):
             print("[FACE] Database wajah kosong")
             return False, None
 
-        matches = face_recognition.compare_faces(known_encodings, face_enc, tolerance=tolerance)
+        matches = face_recognition.compare_faces(
+            known_encodings, face_enc, tolerance=tolerance
+        )
         distances = face_recognition.face_distance(known_encodings, face_enc)
 
         best_idx = np.argmin(distances)
