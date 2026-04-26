@@ -1,6 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from database import init_db, get_db
-from mqtt_client import start_mqtt, kunci_brankas, sync_wajah, status_brankas
+from mqtt_client import (
+    start_mqtt,
+    kunci_brankas,
+    sync_wajah,
+    status_brankas,
+    enroll_status,
+    client,
+)
 from face_engine import clear_cache
 import os
 import base64
@@ -25,7 +32,6 @@ def kontrol_kunci(aksi):
         db = get_db()
         db.execute("INSERT INTO log_brankas (event) VALUES (?)", (aksi,))
         db.commit()
-        # FIX: return JSON bukan redirect supaya halaman tidak reload
         return jsonify({"status": "ok", "aksi": aksi})
     return jsonify({"status": "error", "message": "Aksi tidak valid"}), 400
 
@@ -116,21 +122,39 @@ def halaman_sidik_jari():
 def tambah_sidik_jari():
     nama = request.form["nama"]
     finger_id = request.form["finger_id"]
+
+    # 1. Simpan ke database
     db = get_db()
     db.execute(
         "INSERT INTO sidik_jari (nama, finger_id) VALUES (?, ?)", (nama, finger_id)
     )
     db.commit()
+
+    # 2. Reset enroll_status sebelum mulai
+    enroll_status["status"] = "mulai"
+    enroll_status["pesan"] = f"Memulai enroll ID {finger_id} untuk {nama}"
+
+    # 3. Kirim perintah enroll ke ESP32 via MQTT
+    client.publish("brankas/sidik/enroll", str(finger_id))
+    print(f"[MQTT] Enroll sidik jari ID {finger_id} untuk {nama}")
+
     return redirect(
-        url_for("halaman_sidik_jari") + "?success=Sidik+jari+berhasil+ditambahkan"
+        url_for("halaman_sidik_jari")
+        + "?success=Enroll+dimulai!+Tempelkan+jari+ke+sensor"
     )
 
 
 @app.route("/sidik_jari/hapus/<int:id>", methods=["POST"])
 def hapus_sidik_jari(id):
     db = get_db()
-    db.execute("DELETE FROM sidik_jari WHERE id=?", (id,))
-    db.commit()
+    row = db.execute("SELECT * FROM sidik_jari WHERE id=?", (id,)).fetchone()
+    if row:
+        finger_id = row["finger_id"]
+        db.execute("DELETE FROM sidik_jari WHERE id=?", (id,))
+        db.commit()
+        client.publish("brankas/sidik/hapus", str(finger_id))
+        print(f"[MQTT] Hapus sidik jari ID {finger_id} dari sensor")
+
     return redirect(
         url_for("halaman_sidik_jari") + "?success=Sidik+jari+berhasil+dihapus"
     )
@@ -178,6 +202,13 @@ def hapus_semua_log():
     db.execute("DELETE FROM log_brankas")
     db.commit()
     return jsonify({"status": "ok"})
+
+
+# ─── API ENROLL STATUS (polling dari web) ────────────────
+# Pakai enroll_status dari mqtt_client langsung — bukan dict lokal!
+@app.route("/api/sidik/status")
+def api_sidik_status():
+    return jsonify(enroll_status)
 
 
 # ─── AUTO DELETE LOG ─────────────────────────────────────

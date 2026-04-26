@@ -7,9 +7,69 @@
     <link
       rel="stylesheet"
       href="{{ url_for('static', filename='css/Dashboard.css') }}" />
+    <style>
+      .enroll-banner {
+        display: none;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 18px;
+        border-radius: 12px;
+        margin-bottom: 16px;
+        font-size: 13.5px;
+        font-weight: 600;
+        animation: pulse 1.5s infinite;
+      }
+      .enroll-banner.show {
+        display: flex;
+      }
+      .enroll-banner.waiting {
+        background: rgba(79, 110, 247, 0.08);
+        border: 1.5px solid rgba(79, 110, 247, 0.25);
+        color: #4f6ef7;
+      }
+      .enroll-banner.step2 {
+        background: rgba(255, 184, 48, 0.1);
+        border: 1.5px solid rgba(255, 184, 48, 0.3);
+        color: #c47a00;
+      }
+      .enroll-banner.success {
+        background: rgba(0, 212, 161, 0.08);
+        border: 1.5px solid rgba(0, 212, 161, 0.25);
+        color: #00a877;
+        animation: none;
+      }
+      .enroll-banner.error {
+        background: rgba(245, 59, 87, 0.08);
+        border: 1.5px solid rgba(245, 59, 87, 0.25);
+        color: #f53b57;
+        animation: none;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.7;
+        }
+      }
+      .enroll-spinner {
+        width: 18px;
+        height: 18px;
+        border: 2px solid currentColor;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        flex-shrink: 0;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
   </head>
   <body>
-    <!-- ── SIDEBAR ───────────────────────────────────── -->
     <aside class="sidebar">
       <div class="sidebar-brand">
         <a href="/" class="brand-logo">
@@ -24,9 +84,6 @@
         <span class="nav-label">Menu Utama</span>
         <a href="/" class="nav-item"
           ><span class="nav-icon">🏠</span> Dashboard</a
-        >
-        <a href="/wajah" class="nav-item"
-          ><span class="nav-icon">👤</span> Manajemen Wajah</a
         >
         <a href="/sidik_jari" class="nav-item active"
           ><span class="nav-icon">🖐️</span> Sidik Jari</a
@@ -47,13 +104,8 @@
       </div>
     </aside>
 
-    <!-- ── MAIN ──────────────────────────────────────── -->
     <main class="main">
       <header class="topbar">
-        <div class="topbar-search">
-          <span class="search-icon">🔍</span>
-          <input type="text" placeholder="Cari nama..." />
-        </div>
         <div class="topbar-center">
           <div class="topbar-date" id="topbar-date"></div>
         </div>
@@ -64,6 +116,12 @@
       </header>
 
       <div class="content">
+        <!-- ── BANNER STATUS ENROLL ── -->
+        <div class="enroll-banner" id="enroll-banner">
+          <div class="enroll-spinner" id="enroll-spinner"></div>
+          <span id="enroll-msg">Menunggu jari...</span>
+        </div>
+
         {% if request.args.get('success') %}
         <div class="alert alert-success">
           ✅ {{ request.args.get('success') }}
@@ -82,7 +140,6 @@
           </button>
         </div>
 
-        <!-- Stats -->
         <div style="display: flex; gap: 10px; margin-bottom: 20px">
           <div class="chip chip-primary">
             🖐️ {{ data|length }} sidik jari terdaftar
@@ -90,68 +147,7 @@
           <div class="chip chip-neutral">📦 Maks. 127 slot</div>
         </div>
 
-        <!-- Slot Visualizer -->
-        <div class="card mb-20">
-          <div class="card-header">
-            <span class="card-title">Slot Sidik Jari (ID 1–10)</span>
-            <div
-              style="
-                display: flex;
-                align-items: center;
-                gap: 12px;
-                font-size: 11.5px;
-                color: var(--text-muted);
-              ">
-              <span style="display: flex; align-items: center; gap: 5px">
-                <span
-                  style="
-                    display: inline-block;
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 50%;
-                    background: var(--accent);
-                  "></span>
-                Terisi
-              </span>
-              <span style="display: flex; align-items: center; gap: 5px">
-                <span
-                  style="
-                    display: inline-block;
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 50%;
-                    background: var(--border);
-                  "></span>
-                Kosong
-              </span>
-            </div>
-          </div>
-          <div class="card-body">
-            <div class="finger-slots">
-              {% set used_ids = data | map(attribute='finger_id') | map('int') |
-              list %} {% for i in range(1, 11) %} {% set matched = data |
-              selectattr('finger_id', 'equalto', i | string) | list %}
-              <div
-                class="finger-slot {% if matched %}used{% endif %}"
-                data-slot="{{ i }}"
-                data-used="{{ 'true' if matched else 'false' }}"
-                onclick="handleSlotClick(this)">
-                <span class="slot-num">#{{ i }}</span>
-                <span class="slot-icon"
-                  >{% if matched %}🖐️{% else %}➕{% endif %}</span
-                >
-                {% if matched %}
-                <span class="slot-name">{{ matched[0].nama }}</span>
-                {% else %}
-                <span class="slot-empty-label">Kosong</span>
-                {% endif %}
-              </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-
-        <!-- Table -->
+        <!-- ── TABEL SEMUA PENDAFTARAN ── -->
         <div class="section-header" style="margin-bottom: 14px">
           <span
             style="
@@ -190,7 +186,10 @@
                 <td>
                   <button
                     class="btn btn-sm btn-danger"
-                    onclick="confirmDelete({{ s.id }}, {{ s.nama|tojson }})">
+                    data-id="{{ s.id }}"
+                    data-nama="{{ s.nama }}"
+                    data-finger="{{ s.finger_id }}"
+                    onclick="confirmDelete(this)">
                     🗑️ Hapus
                   </button>
                 </td>
@@ -213,7 +212,7 @@
       </div>
     </main>
 
-    <!-- ── MODAL TAMBAH ──────────────────────────────── -->
+    <!-- ── MODAL TAMBAH ── -->
     <div class="modal-overlay" id="tambah-modal">
       <div class="modal">
         <div class="modal-header">
@@ -223,7 +222,7 @@
           </button>
         </div>
         <div class="modal-body">
-          <form method="POST" action="/sidik_jari/tambah">
+          <form method="POST" action="/sidik_jari/tambah" id="form-tambah">
             <div class="form-group">
               <label class="form-label">Nama Pengguna</label>
               <input
@@ -250,7 +249,7 @@
                   color: var(--text-muted);
                   margin-top: 5px;
                 ">
-                Sesuaikan dengan ID yang sudah diprogram di sensor fingerprint.
+                Pilih ID 1–127. Setelah simpan, tempelkan jari ke sensor.
               </div>
             </div>
             <div class="modal-footer" style="padding: 16px 0 0; margin: 0">
@@ -260,14 +259,16 @@
                 onclick="closeModal('tambah-modal')">
                 Batal
               </button>
-              <button type="submit" class="btn btn-primary">💾 Simpan</button>
+              <button type="submit" class="btn btn-primary">
+                💾 Simpan & Mulai Enroll
+              </button>
             </div>
           </form>
         </div>
       </div>
     </div>
 
-    <!-- ── MODAL HAPUS ───────────────────────────────── -->
+    <!-- ── MODAL HAPUS ── -->
     <div class="modal-overlay" id="hapus-modal">
       <div class="modal">
         <div class="modal-header">
@@ -278,7 +279,8 @@
         </div>
         <div class="modal-body">
           <p style="color: var(--text-secondary); font-size: 14px">
-            Hapus sidik jari <strong id="delete-name"></strong> dari daftar?
+            Hapus sidik jari <strong id="delete-name"></strong> dari daftar dan
+            sensor?<br />
             Tindakan ini tidak bisa dibatalkan.
           </p>
         </div>
@@ -296,11 +298,14 @@
     <div id="toast-container"></div>
 
     <script>
-      const d = new Date();
-      document.getElementById("topbar-date").textContent = d.toLocaleDateString(
-        "id-ID",
-        { weekday: "long", year: "numeric", month: "long", day: "numeric" },
-      );
+      // Tanggal
+      document.getElementById("topbar-date").textContent =
+        new Date().toLocaleDateString("id-ID", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
 
       function openModal(id) {
         document.getElementById(id).classList.add("open");
@@ -309,17 +314,87 @@
         document.getElementById(id).classList.remove("open");
       }
 
-      function confirmDelete(id, nama) {
+      function confirmDelete(btn) {
+        const id = btn.dataset.id;
+        const nama = btn.dataset.nama;
         document.getElementById("delete-name").textContent = nama;
         document.getElementById("form-hapus").action =
           `/sidik_jari/hapus/${id}`;
         openModal("hapus-modal");
       }
 
-      function handleSlotClick(el) {
-        if (el.dataset.used === "true") return;
-        document.getElementById("finger-id-input").value = el.dataset.slot;
-        openModal("tambah-modal");
+      // ── POLLING STATUS ENROLL ──
+      const urlParams = new URLSearchParams(window.location.search);
+      let enrollPolling = null;
+
+      function showBanner(type, msg, spinner = true) {
+        const banner = document.getElementById("enroll-banner");
+        const msgEl = document.getElementById("enroll-msg");
+        const spinEl = document.getElementById("enroll-spinner");
+        banner.className = `enroll-banner show ${type}`;
+        msgEl.textContent = msg;
+        spinEl.style.display = spinner ? "block" : "none";
+      }
+
+      function hideBanner() {
+        document.getElementById("enroll-banner").className = "enroll-banner";
+        if (enrollPolling) {
+          clearInterval(enrollPolling);
+          enrollPolling = null;
+        }
+      }
+
+      function pollEnrollStatus() {
+        fetch("/api/sidik/status")
+          .then((r) => r.json())
+          .then((data) => {
+            const s = data.status;
+            if (s === "step1") {
+              showBanner("waiting", "🖐️ Tempelkan jari pertama ke sensor...");
+            } else if (s === "step2") {
+              showBanner(
+                "step2",
+                "🔄 Angkat jari, lalu tempelkan lagi jari yang sama...",
+              );
+            } else if (s === "success") {
+              showBanner(
+                "success",
+                "✅ Sidik jari berhasil didaftarkan ke sensor!",
+                false,
+              );
+              setTimeout(hideBanner, 4000);
+              if (enrollPolling) {
+                clearInterval(enrollPolling);
+                enrollPolling = null;
+              }
+            } else if (s === "error") {
+              showBanner(
+                "error",
+                "❌ Gagal enroll: " + (data.pesan || "Coba lagi"),
+                false,
+              );
+              setTimeout(hideBanner, 5000);
+              if (enrollPolling) {
+                clearInterval(enrollPolling);
+                enrollPolling = null;
+              }
+            }
+          })
+          .catch(() => {});
+      }
+
+      if (
+        urlParams.get("success") &&
+        urlParams.get("success").includes("Enroll")
+      ) {
+        showBanner("waiting", "🖐️ Tempelkan jari pertama ke sensor...");
+        enrollPolling = setInterval(pollEnrollStatus, 1500);
+        setTimeout(() => {
+          if (enrollPolling) {
+            clearInterval(enrollPolling);
+            hideBanner();
+          }
+        }, 40000);
       }
     </script>
   </body>
