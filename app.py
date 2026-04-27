@@ -1,3 +1,4 @@
+# ─── IMPORTS ─────────────────────────────────────────────
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from database import init_db, get_db
 from mqtt_client import (
@@ -7,18 +8,24 @@ from mqtt_client import (
     status_brankas,
     enroll_status,
     client,
+    publish_verify_result,
+    verify_status,
 )
-from face_engine import clear_cache
+from face_engine import verify_face, clear_cache, register_face
 import os
 import base64
 import uuid
 import threading
+from PIL import Image
+import numpy as np
+import io
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "static/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
+# ─── INDEX ───────────────────────────────────────────────
 @app.route("/")
 def index():
     return render_template("index.html", status=status_brankas["keadaan"])
@@ -67,9 +74,12 @@ def tambah_wajah():
     db = get_db()
     db.execute("INSERT INTO wajah (nama, foto_path) VALUES (?, ?)", (nama, path))
     db.commit()
+
+    hasil_register = register_face(nama, path)
     sync_wajah({"aksi": "tambah", "nama": nama, "path": path})
     clear_cache()
-    return redirect(url_for("halaman_wajah") + "?success=Wajah+berhasil+ditambahkan")
+    return redirect(url_for("halaman_wajah") +
+        f"?success=Wajah+{nama}+ditambahkan:+{hasil_register['pesan']}")
 
 
 @app.route("/wajah/update/<int:id>", methods=["POST"])
@@ -85,9 +95,7 @@ def update_wajah(id):
             filename = f"{nama}_{foto.filename}"
             path = os.path.join(UPLOAD_FOLDER, filename)
             foto.save(path)
-            db.execute(
-                "UPDATE wajah SET nama=?, foto_path=? WHERE id=?", (nama, path, id)
-            )
+            db.execute("UPDATE wajah SET nama=?, foto_path=? WHERE id=?", (nama, path, id))
         else:
             db.execute("UPDATE wajah SET nama=? WHERE id=?", (nama, id))
         db.commit()
@@ -110,6 +118,97 @@ def hapus_wajah(id):
     return redirect(url_for("halaman_wajah") + "?success=Wajah+berhasil+dihapus")
 
 
+# ─── ENDPOINT UNTUK ESP32-CAM ────────────────────────────
+@app.route("/register", methods=["POST"])
+def esp_cam_register():
+    """Terima foto JPEG langsung dari ESP32-CAM untuk register."""
+    nama = request.args.get("name", "unknown")
+    img_bytes = request.data
+
+    if not img_bytes:
+        return "ERROR: Tidak ada gambar", 400
+
+    filename = f"{nama}_{uuid.uuid4().hex[:8]}.jpg"
+    path = os.path.join(UPLOAD_FOLDER, filename)
+    with open(path, "wb") as f:
+        f.write(img_bytes)
+
+    db = get_db()
+    db.execute("INSERT INTO wajah (nama, foto_path) VALUES (?, ?)", (nama, path))
+    db.commit()
+
+    hasil = register_face(nama, path)
+    sync_wajah({"aksi": "tambah", "nama": nama, "path": path})
+    clear_cache()
+
+    db.execute("INSERT INTO log_brankas (event) VALUES (?)", (f"REGISTER:{nama}",))
+    db.commit()
+
+    print(f"[ESP-CAM] Register {nama} → {hasil['pesan']}")
+    return f"OK: {nama} terdaftar", 200
+
+
+@app.route("/scan", methods=["POST"])
+def esp_cam_scan():
+    """Terima foto JPEG dari ESP32-CAM untuk verifikasi."""
+    img_bytes = request.data
+
+    if not img_bytes:
+        return "ERROR: Tidak ada gambar", 400
+
+    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    img_array = np.array(img)
+    hasil = verify_face(img_array=img_array)
+
+    db = get_db()
+    event = f"FACE_{'OK' if hasil['match'] else 'FAIL'}:{hasil.get('nama', '?')}"
+    db.execute("INSERT INTO log_brankas (event) VALUES (?)", (event,))
+    db.commit()
+
+    publish_verify_result(hasil)
+
+    print(f"[ESP-CAM] Scan → {hasil['pesan']}")
+
+    if hasil["match"]:
+        return f"OK:{hasil['nama']}", 200
+    else:
+        return "FAIL", 200
+
+
+# ─── VERIFY VIA WEB ──────────────────────────────────────
+@app.route("/api/wajah/verify", methods=["POST"])
+def api_verify_wajah():
+    foto = request.files.get("foto")
+    foto_base64 = request.form.get("foto_base64", "")
+
+    if foto and foto.filename != "":
+        tmp_path = os.path.join(UPLOAD_FOLDER, f"tmp_verify_{uuid.uuid4().hex}.jpg")
+        foto.save(tmp_path)
+        hasil = verify_face(foto_path=tmp_path)
+        os.remove(tmp_path)
+    elif foto_base64:
+        header, data = foto_base64.split(",", 1)
+        img_bytes = base64.b64decode(data)
+        img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        img_array = np.array(img)
+        hasil = verify_face(img_array=img_array)
+    else:
+        return jsonify({"error": "Tidak ada foto"}), 400
+
+    db = get_db()
+    event = f"FACE_{'OK' if hasil['match'] else 'FAIL'}:{hasil.get('nama', '?')}"
+    db.execute("INSERT INTO log_brankas (event) VALUES (?)", (event,))
+    db.commit()
+
+    publish_verify_result(hasil)
+    return jsonify(hasil)
+
+
+@app.route("/api/wajah/verify/status")
+def api_verify_status():
+    return jsonify(verify_status)
+
+
 # ─── MANAJEMEN SIDIK JARI ────────────────────────────────
 @app.route("/sidik_jari")
 def halaman_sidik_jari():
@@ -122,26 +221,15 @@ def halaman_sidik_jari():
 def tambah_sidik_jari():
     nama = request.form["nama"]
     finger_id = request.form["finger_id"]
-
-    # 1. Simpan ke database
     db = get_db()
-    db.execute(
-        "INSERT INTO sidik_jari (nama, finger_id) VALUES (?, ?)", (nama, finger_id)
-    )
+    db.execute("INSERT INTO sidik_jari (nama, finger_id) VALUES (?, ?)", (nama, finger_id))
     db.commit()
-
-    # 2. Reset enroll_status sebelum mulai
     enroll_status["status"] = "mulai"
     enroll_status["pesan"] = f"Memulai enroll ID {finger_id} untuk {nama}"
-
-    # 3. Kirim perintah enroll ke ESP32 via MQTT
     client.publish("brankas/sidik/enroll", str(finger_id))
     print(f"[MQTT] Enroll sidik jari ID {finger_id} untuk {nama}")
-
-    return redirect(
-        url_for("halaman_sidik_jari")
-        + "?success=Enroll+dimulai!+Tempelkan+jari+ke+sensor"
-    )
+    return redirect(url_for("halaman_sidik_jari") +
+        "?success=Enroll+dimulai!+Tempelkan+jari+ke+sensor")
 
 
 @app.route("/sidik_jari/hapus/<int:id>", methods=["POST"])
@@ -154,19 +242,15 @@ def hapus_sidik_jari(id):
         db.commit()
         client.publish("brankas/sidik/hapus", str(finger_id))
         print(f"[MQTT] Hapus sidik jari ID {finger_id} dari sensor")
-
-    return redirect(
-        url_for("halaman_sidik_jari") + "?success=Sidik+jari+berhasil+dihapus"
-    )
+    return redirect(url_for("halaman_sidik_jari") + "?success=Sidik+jari+berhasil+dihapus")
 
 
-# ─── API STATUS ──────────────────────────────────────────
+# ─── API ─────────────────────────────────────────────────
 @app.route("/api/status")
 def api_status():
     return jsonify(status_brankas)
 
 
-# ─── LOG AKTIVITAS ───────────────────────────────────────
 @app.route("/api/log")
 def api_log():
     db = get_db()
@@ -176,7 +260,6 @@ def api_log():
     return jsonify([dict(row) for row in logs])
 
 
-# ─── SETTINGS ────────────────────────────────────────────
 @app.route("/api/settings", methods=["GET"])
 def get_settings():
     db = get_db()
@@ -189,9 +272,7 @@ def update_settings():
     data = request.get_json()
     db = get_db()
     for key, value in data.items():
-        db.execute(
-            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value)
-        )
+        db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
     db.commit()
     return jsonify({"status": "ok"})
 
@@ -204,8 +285,6 @@ def hapus_semua_log():
     return jsonify({"status": "ok"})
 
 
-# ─── API ENROLL STATUS (polling dari web) ────────────────
-# Pakai enroll_status dari mqtt_client langsung — bukan dict lokal!
 @app.route("/api/sidik/status")
 def api_sidik_status():
     return jsonify(enroll_status)

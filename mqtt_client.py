@@ -12,11 +12,16 @@ TOPIC_KUNCI = "brankas/kunci"
 TOPIC_STATUS = "brankas/status"
 TOPIC_WAJAH = "brankas/wajah/sync"
 TOPIC_SIDIK_RESULT = "brankas/sidik/result"
+TOPIC_WAJAH_RESULT = "brankas/wajah/result"   # publish hasil verifikasi
+TOPIC_WAJAH_VERIFY = "brankas/wajah/verify"   # terima trigger verify dari ESP32 
+
 
 # ─── SHARED STATE ────────────────────────────────────────
 status_brankas = {"keadaan": "tidak diketahui"}
 enroll_status = {"status": "idle", "pesan": ""}
 
+# ─── shared state ────────────────────────────────────────
+verify_status = {"match": False, "nama": None, "confidence": 0.0, "pesan": "Menunggu..."}
 
 # ─── CALLBACKS ───────────────────────────────────────────
 def on_message(client, userdata, msg):
@@ -45,10 +50,27 @@ def on_message(client, userdata, msg):
             enroll_status["pesan"] = payload.replace("ERROR:", "").strip()
 
 
+    elif msg.topic == TOPIC_WAJAH_VERIFY:
+        import base64, numpy as np
+        from PIL import Image
+        import io
+        from face_engine import verify_face
+        try:
+            img_bytes = base64.b64decode(msg.payload)
+            img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+            img_array = np.array(img)
+            hasil = verify_face(img_array=img_array)
+            verify_status.update(hasil)
+            client.publish(TOPIC_WAJAH_RESULT, json.dumps(hasil))
+        except Exception as e:
+            print(f"[MQTT] Error verify: {e}")
+
+
 def on_connect(client, userdata, flags, rc):
     print(f"[MQTT] Connected, rc={rc}")
     client.subscribe(TOPIC_STATUS)
     client.subscribe(TOPIC_SIDIK_RESULT)
+    client.subscribe(TOPIC_WAJAH_VERIFY)
 
 
 # ─── CLIENT SETUP ────────────────────────────────────────
@@ -79,3 +101,8 @@ def kunci_brankas(aksi: str):
 def sync_wajah(data: dict):
     """Sinkronisasi data wajah ke ESP32."""
     client.publish(TOPIC_WAJAH, json.dumps(data))
+
+# Fungsi helper untuk publish hasil verifikasi manual:
+def publish_verify_result(hasil: dict):
+    client.publish(TOPIC_WAJAH_RESULT, json.dumps(hasil))
+    print(f"[MQTT] Publish result: {hasil['pesan']}")
