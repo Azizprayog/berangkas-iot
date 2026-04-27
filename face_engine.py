@@ -5,12 +5,12 @@ import sqlite3
 import io
 
 DB_PATH = "brankas.db"
+UPLOAD_FOLDER = "static/uploads"
 
-# ================= CACHE =================
-_cache = {"encodings": [], "names": []}
+# Cache
+_cache: dict = {"encodings": [], "names": []}
 
 
-# ================= LOAD FACE DATA =================
 def load_known_faces(force_reload=False):
     if not force_reload and _cache["encodings"]:
         return _cache["encodings"], _cache["names"]
@@ -25,149 +25,125 @@ def load_known_faces(force_reload=False):
 
     for row in rows:
         path = row["foto_path"]
-
         if not os.path.exists(path):
             continue
-
         try:
             img = face_recognition.load_image_file(path)
-            encs = face_recognition.face_encodings(img)
-
-            if encs:
-                known_encodings.append(encs[0])
+            encodings = face_recognition.face_encodings(img)
+            if encodings:
+                known_encodings.append(encodings[0])
                 known_names.append(row["nama"])
                 print(f"[FACE] Loaded: {row['nama']}")
-
         except Exception as e:
             print(f"[FACE] Error loading {path}: {e}")
 
     _cache["encodings"] = known_encodings
     _cache["names"] = known_names
-
     return known_encodings, known_names
 
 
-# ================= CLEAR CACHE =================
 def clear_cache():
     _cache["encodings"] = []
     _cache["names"] = []
     print("[FACE] Cache cleared")
 
 
-# ================= REGISTER FACE =================
 def register_face(nama: str, foto_path: str) -> dict:
+    """Encode wajah dari foto dan simpan ke cache known faces."""
     if not os.path.exists(foto_path):
         return {"success": False, "pesan": "File foto tidak ditemukan"}
-
     try:
         img = face_recognition.load_image_file(foto_path)
         encs = face_recognition.face_encodings(img)
-
         if not encs:
-            return {"success": False, "pesan": "Wajah tidak terdeteksi"}
+            return {"success": False, "pesan": "Wajah tidak terdeteksi di foto"}
 
-        encoding = encs[0]
-
-        # simpan ke cache
-        _cache["encodings"].append(encoding)
+        _cache["encodings"].append(encs[0])
         _cache["names"].append(nama)
-
-        # simpan ke database juga (WAJIB FIX INI)
-        conn = sqlite3.connect(DB_PATH)
-        conn.execute(
-            "INSERT INTO wajah (nama, foto_path) VALUES (?, ?)",
-            (nama, foto_path)
-        )
-        conn.commit()
-        conn.close()
-
         print(f"[FACE] Register: {nama}")
-
-        return {"success": True, "pesan": f"Wajah {nama} berhasil diregister"}
-
+        return {"success": True, "pesan": f"Wajah '{nama}' berhasil diregister"}
     except Exception as e:
         return {"success": False, "pesan": f"Error: {e}"}
 
 
-# ================= VERIFY FACE (MAIN FUNCTION) =================
-def verify_face(img_array=None, foto_path=None, threshold=0.48):
+def verify_face_bytes(image_bytes, tolerance=0.5):
+    """Versi lama — dipanggil dari kode lama jika masih ada."""
     try:
-        # pilih sumber gambar
+        img = face_recognition.load_image_file(io.BytesIO(image_bytes))
+        encodings = face_recognition.face_encodings(img)
+
+        if not encodings:
+            print("[FACE] Tidak ada wajah terdeteksi")
+            return False, None
+
+        face_enc = encodings[0]
+        known_encodings, known_names = load_known_faces()
+
+        if not known_encodings:
+            print("[FACE] Database wajah kosong")
+            return False, None
+
+        matches = face_recognition.compare_faces(
+            known_encodings, face_enc, tolerance=tolerance
+        )
+        distances = face_recognition.face_distance(known_encodings, face_enc)
+
+        best_idx = np.argmin(distances)
+        if matches[best_idx]:
+            nama = known_names[best_idx]
+            print(f"[FACE] Cocok: {nama} (distance: {distances[best_idx]:.3f})")
+            return True, nama
+        else:
+            print(f"[FACE] Tidak cocok (distance: {distances[best_idx]:.3f})")
+            return False, None
+
+    except Exception as e:
+        print(f"[FACE] Error: {e}")
+        return False, None
+
+
+def verify_face(img_array=None, foto_path=None, threshold=0.5):
+    try:
         if img_array is not None:
             unknown_img = img_array
         elif foto_path and os.path.exists(foto_path):
             unknown_img = face_recognition.load_image_file(foto_path)
         else:
-            return {
-                "match": False,
-                "nama": None,
-                "confidence": 0.0,
-                "pesan": "Invalid image"
-            }
+            return {"match": False, "nama": None, "confidence": 0.0, "pesan": "Invalid image"}
 
-        # detect wajah
         unknown_encs = face_recognition.face_encodings(unknown_img)
 
         if len(unknown_encs) != 1:
-            return {
-                "match": False,
-                "nama": None,
-                "confidence": 0.0,
-                "pesan": "Wajah harus 1 orang saja"
-            }
+            return {"match": False, "nama": None, "confidence": 0.0, "pesan": "Wajah harus 1 orang"}
 
         unknown_enc = unknown_encs[0]
 
-        # load database
         known_encodings, known_names = load_known_faces()
 
         if not known_encodings:
-            return {
-                "match": False,
-                "nama": None,
-                "confidence": 0.0,
-                "pesan": "Database kosong"
-            }
+            return {"match": False, "nama": None, "confidence": 0.0, "pesan": "DB kosong"}
 
-        # hitung jarak
         distances = face_recognition.face_distance(known_encodings, unknown_enc)
-
-        if len(distances) == 0:
-            return {
-                "match": False,
-                "nama": None,
-                "confidence": 0.0,
-                "pesan": "No match data"
-            }
-
         best_idx = int(np.argmin(distances))
         best_distance = float(distances[best_idx])
-
-        # confidence (simple tapi stabil untuk demo)
         confidence = max(0.0, 1.0 - best_distance)
 
-        best_name = known_names[best_idx]
+        best_nama = known_names[best_idx] if known_names else None
 
-        # keputusan
         if best_distance <= threshold:
             return {
                 "match": True,
-                "nama": best_name,
-                "confidence": round(confidence, 3),
-                "pesan": f"Cocok: {best_name}"
+                "nama": best_nama,
+                "confidence": confidence,
+                "pesan": f"Cocok: {best_nama}"
             }
         else:
             return {
                 "match": False,
                 "nama": None,
-                "confidence": round(confidence, 3),
+                "confidence": confidence,
                 "pesan": "Tidak dikenali"
             }
 
     except Exception as e:
-        return {
-            "match": False,
-            "nama": None,
-            "confidence": 0.0,
-            "pesan": f"Error: {e}"
-        }
+        return {"match": False, "nama": None, "confidence": 0.0, "pesan": f"Error: {e}"}
