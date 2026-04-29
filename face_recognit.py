@@ -18,12 +18,11 @@ import paho.mqtt.client as mqtt
 DB_PATH       = "brankas.db"
 UPLOAD_FOLDER = "static/uploads/foto"
 
-MQTT_BROKER          = "localhost"
+MQTT_BROKER          = "10.42.0.32"
 MQTT_PORT            = 1883
-MQTT_TOPIC_REG_CMD   = "brankas/register/cmd"    # kirim nama dulu: {"nama": "Budi"}
-MQTT_TOPIC_REG_IMAGE = "brankas/register/image"  # lalu kirim raw JPEG
-MQTT_TOPIC_STATUS    = "brankas/register/status" # feedback hasil registrasi
-
+MQTT_TOPIC_REG_CMD   = "brankas/wajah/register"
+MQTT_TOPIC_REG_IMAGE = "brankas/wajah/image"
+MQTT_TOPIC_STATUS    = "brankas/wajah/status"
 PENDING_TIMEOUT = 30  # detik — nama expired setelah N detik tanpa foto
 
 logging.basicConfig(
@@ -277,6 +276,7 @@ def main() -> None:
     client.on_message = on_message
 
     logger.info(f"Menghubungkan ke {MQTT_BROKER}:{MQTT_PORT} ...")
+    client.username_pw_set("sentinel", "Tes12345")
     client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
 
     logger.info("Service berjalan. Ctrl+C untuk stop.")

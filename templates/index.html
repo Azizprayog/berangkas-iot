@@ -509,18 +509,6 @@
             </div>
           </div>
 
-          <!-- Sidik Jari -->
-          <div class="stat-card">
-            <div class="stat-top">
-              <div class="stat-label">Sidik Jari</div>
-              <a href="/sidik_jari" class="stat-link">↗</a>
-            </div>
-            <div class="stat-val" id="stat-jari">—</div>
-            <div class="stat-footer">
-              <span class="stat-tag gray">🖐️ Slot terdaftar</span>
-            </div>
-          </div>
-
           <!-- Akses Ditolak -->
           <div class="stat-card">
             <div class="stat-top">
@@ -1298,21 +1286,18 @@
       }
 
       // ── COUNT STATS ─────────────────────────────────
-      async function loadCounts() {
-        try {
-          const [wRes, sRes] = await Promise.all([
-            fetch("/wajah"),
-            fetch("/sidik_jari"),
-          ]);
-          const [wHtml, sHtml] = await Promise.all([wRes.text(), sRes.text()]);
-          const wCount = (wHtml.match(/face-card/g) || []).length;
-          document.getElementById("stat-wajah") &&
-            (document.getElementById("stat-wajah").textContent = wCount || "—");
-          const sCount = (sHtml.match(/chip-primary/g) || []).length;
-          document.getElementById("stat-jari").textContent =
-            Math.max(0, sCount - 1) || "—";
-        } catch (e) {}
-      }
+    async function loadCounts() {
+      try {
+        const [wRes] = await Promise.all([
+          fetch("/wajah")
+        ]);
+        const [wHtml] = await Promise.all([wRes.text()]);
+        const wCount = (wHtml.match(/face-card/g) || []).length;
+        document.getElementById("stat-wajah") &&
+          (document.getElementById("stat-wajah").textContent = wCount || "—");
+
+      } catch (e) {}
+    }
 
       // ── DEBOUNCED REFRESH ────────────────────────────
       let refreshTimer = null;
