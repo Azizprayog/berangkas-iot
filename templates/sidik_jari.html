@@ -349,6 +349,14 @@
           .then((r) => r.json())
           .then((data) => {
             const s = data.status;
+
+            if (s === "idle") {
+              showBanner(
+                "waiting",
+                "🔐 Sidik jari sedang dibuat. Mohon tempelkan sidik jari Anda pada sensor.",
+              );
+            }
+
             if (s === "step1") {
               showBanner("waiting", "🖐️ Tempelkan jari pertama ke sensor...");
             } else if (s === "step2") {
@@ -396,6 +404,14 @@
           }
         }, 40000);
       }
+
+      document.getElementById("form-tambah").addEventListener("submit", () => {
+        showBanner(
+          "waiting",
+          "🔐 Sidik jari sedang dibuat. Mohon tempelkan sidik jari Anda pada sensor.",
+        );
+      });
+      setInterval(pollEnrollStatus, 1000);
     </script>
   </body>
 </html>
