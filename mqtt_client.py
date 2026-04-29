@@ -1,108 +1,176 @@
 import paho.mqtt.client as mqtt
 import json
-import ssl
+import requests
+import time
+import os
+import threading
+import numpy as np
+from PIL import Image
+import io
+from face_engine import verify_face
 
-BROKER = "294542ce25054f91be349c2b99c45ebc.s1.eu.hivemq.cloud"
-PORT = 8883
-USERNAME = "sentinel"
-PASSWORD = "Tes12345"
+# ─── MQTT CONFIG ─────────────────────────────────────────
+BROKER = "10.42.0.32"   # 🔥 ganti IP Laptop
+PORT   = 1883
+
+# ─── ESP32 CAM ───────────────────────────────────────────
+ESP32_CAM_URL = "http://192.168.1.10/capture"  # 🔥 ganti IP cam
 
 # ─── TOPICS ──────────────────────────────────────────────
-TOPIC_KUNCI = "brankas/kunci"
-TOPIC_STATUS = "brankas/status"
-TOPIC_WAJAH = "brankas/wajah/sync"
+TOPIC_KUNCI        = "brankas/kunci"
+TOPIC_STATUS       = "brankas/status"
+TOPIC_WAJAH        = "brankas/wajah/sync"
 TOPIC_SIDIK_RESULT = "brankas/sidik/result"
-TOPIC_WAJAH_RESULT = "brankas/wajah/result"   # publish hasil verifikasi
-TOPIC_WAJAH_VERIFY = "brankas/wajah/verify"   # terima trigger verify dari ESP32 
+TOPIC_WAJAH_VERIFY = "brankas/wajah/verify"
+TOPIC_WAJAH_RESULT = "brankas/wajah/result"
 
+# ─── FOLDER ──────────────────────────────────────────────
+UPLOAD_FOLDER = "static/uploads/foto"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ─── SHARED STATE ────────────────────────────────────────
 status_brankas = {"keadaan": "tidak diketahui"}
-enroll_status = {"status": "idle", "pesan": ""}
+enroll_status  = {"status": "idle", "pesan": ""}
 
-# ─── shared state ────────────────────────────────────────
-verify_status = {"match": False, "nama": None, "confidence": 0.0, "pesan": "Menunggu..."}
+verify_status  = {
+    "match"     : False,
+    "nama"      : None,
+    "confidence": 0.0,
+    "pesan"     : "Menunggu..."
+}
+
+# ─── THREAD SAFETY ───────────────────────────────────────
+_verify_lock = threading.Lock()
+is_verifying = False
+
+# ─── FACE VERIFY (THREAD) ────────────────────────────────
+def do_verify(client):
+    global is_verifying
+
+    # 🔐 anti race condition
+    with _verify_lock:
+        if is_verifying:
+            print("[INFO] Masih proses sebelumnya, skip")
+            return
+        is_verifying = True
+
+    try:
+        print("[PROCESS] Ambil gambar dari ESP32-CAM...")
+
+        try:
+            res = requests.get(ESP32_CAM_URL, timeout=5)
+        except requests.exceptions.Timeout:
+            print("[ERROR] Timeout ke ESP32-CAM")
+            return
+        except requests.exceptions.ConnectionError:
+            print("[ERROR] Tidak bisa connect ke ESP32-CAM")
+            return
+
+        if res.status_code != 200:
+            print(f"[ERROR] HTTP status {res.status_code}")
+            return
+
+        # ── Simpan file
+        filename = f"{UPLOAD_FOLDER}/{int(time.time())}.jpg"
+        with open(filename, "wb") as f:
+            f.write(res.content)
+        print(f"[INFO] Foto disimpan: {filename}")
+
+        # ── Convert ke numpy
+        img = Image.open(io.BytesIO(res.content)).convert("RGB")
+        img_array = np.array(img)
+
+        print("[PROCESS] Running face recognition...")
+        hasil = verify_face(img_array=img_array)
+
+        verify_status.update(hasil)
+        print(f"[RESULT] {hasil}")
+
+        # ── Publish hasil
+        client.publish(TOPIC_WAJAH_RESULT, json.dumps(hasil))
+
+    except Exception as e:
+        print(f"[ERROR] Verify gagal: {e}")
+
+    finally:
+        # 🔓 release lock
+        with _verify_lock:
+            is_verifying = False
 
 # ─── CALLBACKS ───────────────────────────────────────────
 def on_message(client, userdata, msg):
+    print(f"[MQTT] Topic masuk: {msg.topic}")
 
-    # Status brankas dari ESP32
     if msg.topic == TOPIC_STATUS:
         payload = msg.payload.decode().strip().lower()
         status_brankas["keadaan"] = payload
-        print(f"[MQTT] Status brankas dari ESP32: {payload}")
+        print(f"[MQTT] Status brankas: {payload}")
 
-    # Hasil enroll sidik jari dari ESP32
     elif msg.topic == TOPIC_SIDIK_RESULT:
         payload = msg.payload.decode().strip()
-        print(f"[MQTT] Enroll result: {payload}")
-        if payload.startswith("ENROLL_STEP1"):
-            enroll_status["status"] = "step1"
-            enroll_status["pesan"] = "Tempelkan jari pertama"
-        elif payload.startswith("ENROLL_STEP2"):
-            enroll_status["status"] = "step2"
-            enroll_status["pesan"] = "Tempelkan jari yang sama lagi"
-        elif payload.startswith("SUCCESS"):
-            enroll_status["status"] = "success"
-            enroll_status["pesan"] = "Berhasil"
-        elif payload.startswith("ERROR"):
-            enroll_status["status"] = "error"
-            enroll_status["pesan"] = payload.replace("ERROR:", "").strip()
+        print(f"[MQTT] Sidik result: {payload}")
 
+        if payload.startswith("ENROLL_STEP1"):
+            enroll_status.update({"status": "step1", "pesan": "Tempelkan jari pertama"})
+        elif payload.startswith("ENROLL_STEP2"):
+            enroll_status.update({"status": "step2", "pesan": "Tempelkan jari yang sama lagi"})
+        elif payload.startswith("SUCCESS"):
+            enroll_status.update({"status": "success", "pesan": "Berhasil"})
+        elif payload.startswith("ERROR"):
+            enroll_status.update({"status": "error", "pesan": payload.replace("ERROR:", "").strip()})
 
     elif msg.topic == TOPIC_WAJAH_VERIFY:
-        import base64, numpy as np
-        from PIL import Image
-        import io
-        from face_engine import verify_face
-        try:
-            img_bytes = base64.b64decode(msg.payload)
-            img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-            img_array = np.array(img)
-            hasil = verify_face(img_array=img_array)
-            verify_status.update(hasil)
-            client.publish(TOPIC_WAJAH_RESULT, json.dumps(hasil))
-        except Exception as e:
-            print(f"[MQTT] Error verify: {e}")
+        print("[MQTT] Trigger VERIFY diterima")
+        threading.Thread(target=do_verify, args=(client,), daemon=True).start()
 
-
+# ─── CONNECT (kompatibel semua versi paho) ───────────────
 def on_connect(client, userdata, flags, rc):
-    print(f"[MQTT] Connected, rc={rc}")
-    client.subscribe(TOPIC_STATUS)
-    client.subscribe(TOPIC_SIDIK_RESULT)
-    client.subscribe(TOPIC_WAJAH_VERIFY)
+    if rc == 0:
+        print("[MQTT] Connected ke Mosquitto")
 
+        client.subscribe(TOPIC_STATUS)
+        client.subscribe(TOPIC_SIDIK_RESULT)
+        client.subscribe(TOPIC_WAJAH_VERIFY)
+
+    else:
+        print(f"[MQTT] Gagal connect, rc={rc}")
+
+def on_disconnect(client, userdata, rc):
+    print(f"[MQTT] Disconnected rc={rc} (auto reconnect by loop_start)")
 
 # ─── CLIENT SETUP ────────────────────────────────────────
 client = mqtt.Client()
-client.on_connect = on_connect
-client.on_message = on_message
+client.on_connect    = on_connect
+client.on_message    = on_message
+client.on_disconnect = on_disconnect
 
-
-# ─── FUNCTIONS ───────────────────────────────────────────
+# ─── START MQTT ──────────────────────────────────────────
 def start_mqtt():
-    client.username_pw_set(USERNAME, PASSWORD)
-    client.tls_set(cert_reqs=ssl.CERT_REQUIRED)
-    client.tls_insecure_set(False)
+    print("[SYSTEM] Connecting ke MQTT...")
     client.connect(BROKER, PORT, 60)
     client.loop_start()
 
-
+# ─── CONTROL FUNCTIONS ───────────────────────────────────
 def kunci_brankas(aksi: str):
-    """Kirim perintah LOCK / UNLOCK ke ESP32."""
     client.publish(TOPIC_KUNCI, aksi)
+
     if aksi == "UNLOCK":
         status_brankas["keadaan"] = "terbuka"
     elif aksi == "LOCK":
         status_brankas["keadaan"] = "terkunci"
-    print(f"[MQTT] Perintah {aksi} dikirim, status lokal → {status_brankas['keadaan']}")
 
+    print(f"[MQTT] {aksi} dikirim")
 
 def sync_wajah(data: dict):
-    """Sinkronisasi data wajah ke ESP32."""
     client.publish(TOPIC_WAJAH, json.dumps(data))
 
-# Fungsi helper untuk publish hasil verifikasi manual:
 def publish_verify_result(hasil: dict):
     client.publish(TOPIC_WAJAH_RESULT, json.dumps(hasil))
-    print(f"[MQTT] Publish result: {hasil['pesan']}")
+
+# ─── RUN MANUAL TEST ─────────────────────────────────────
+if __name__ == "__main__":
+    start_mqtt()
+    print("[SYSTEM] MQTT client running...")
+
+    while True:
+        time.sleep(1)

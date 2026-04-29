@@ -350,6 +350,63 @@
       .topbar-search {
         display: none !important;
       }
+
+      /* ── FACE ACTION CARDS ─────────────────────────── */
+      .stat-card.face-scan {
+        background: linear-gradient(135deg, #f0f3ff 0%, #e8edff 100%);
+        border: 1.5px solid rgba(79, 110, 247, 0.2);
+      }
+      .stat-card.face-regis {
+        background: linear-gradient(135deg, #f0fdf8 0%, #e0f9f0 100%);
+        border: 1.5px solid rgba(0, 212, 161, 0.2);
+      }
+      .face-action-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        border: none;
+        border-radius: 9px;
+        padding: 7px 16px;
+        font-size: 12.5px;
+        font-weight: 700;
+        color: #fff;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.18s ease;
+        letter-spacing: 0.2px;
+      }
+      .face-action-btn.scan {
+        background: linear-gradient(135deg, #4f6ef7, #6b54f0);
+        box-shadow: 0 3px 12px rgba(79, 110, 247, 0.35);
+      }
+      .face-action-btn.regis {
+        background: linear-gradient(135deg, #00d4a1, #0f9e76);
+        box-shadow: 0 3px 12px rgba(0, 212, 161, 0.35);
+      }
+      .face-action-btn:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.08);
+      }
+      .face-action-btn:active {
+        transform: scale(0.96);
+      }
+      .face-action-btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .face-icon-large {
+        font-size: 26px;
+        line-height: 1;
+        margin-bottom: 2px;
+        display: block;
+      }
+      .stat-card .stat-label {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.8px;
+        text-transform: uppercase;
+      }
     </style>
   </head>
   <body>
@@ -423,7 +480,6 @@
             </div>
           </div>
           <div class="hero-btns">
-            <!-- FIX: pakai onclick fetch, bukan form POST supaya tidak reload halaman -->
             <button
               class="btn btn-success hero-btn-lock"
               id="btn-unlock"
@@ -441,6 +497,7 @@
 
         <!-- Stats Row -->
         <div class="stats-row">
+          <!-- Total Log Akses -->
           <div class="stat-card blue">
             <div class="stat-top">
               <div class="stat-label">Total Log Akses</div>
@@ -451,6 +508,8 @@
               <span class="stat-tag">📋 Semua waktu</span>
             </div>
           </div>
+
+          <!-- Sidik Jari -->
           <div class="stat-card">
             <div class="stat-top">
               <div class="stat-label">Sidik Jari</div>
@@ -461,6 +520,8 @@
               <span class="stat-tag gray">🖐️ Slot terdaftar</span>
             </div>
           </div>
+
+          <!-- Akses Ditolak -->
           <div class="stat-card">
             <div class="stat-top">
               <div class="stat-label">Akses Ditolak</div>
@@ -469,6 +530,38 @@
             <div class="stat-val" id="stat-denied">—</div>
             <div class="stat-footer">
               <span class="stat-tag red" id="stat-denied-tag">⚠ Hari ini</span>
+            </div>
+          </div>
+
+          <!-- Scan Wajah -->
+          <div class="stat-card face-scan">
+            <div class="stat-top">
+              <div class="stat-label" style="color:#4f6ef7;">Scan Wajah</div>
+            </div>
+            <span class="face-icon-large">👤</span>
+            <div class="stat-footer" style="margin-top: 6px;">
+              <button
+                class="face-action-btn scan"
+                id="btn-scan-wajah"
+                onclick="mulaiScanWajah()">
+                📷 Scan
+              </button>
+            </div>
+          </div>
+
+          <!-- Regis Wajah -->
+          <div class="stat-card face-regis">
+            <div class="stat-top">
+              <div class="stat-label" style="color:#0f9e76;">Regis Wajah</div>
+            </div>
+            <span class="face-icon-large">🆕</span>
+            <div class="stat-footer" style="margin-top: 6px;">
+              <button
+                class="face-action-btn regis"
+                id="btn-regis-wajah"
+                onclick="mulaiRegisWajah()">
+                ➕ Regis
+              </button>
             </div>
           </div>
         </div>
@@ -535,6 +628,11 @@
                   <div class="auth-card">
                     <span class="auth-icon">💳</span>
                     <div class="auth-name">RFID Card</div>
+                    <span class="chip chip-success">✓ Aktif</span>
+                  </div>
+                  <div class="auth-card">
+                    <span class="auth-icon">👤</span>
+                    <div class="auth-name">Face Recognition</div>
                     <span class="chip chip-success">✓ Aktif</span>
                   </div>
                 </div>
@@ -677,10 +775,19 @@
               </div>
               <div class="card-body">
                 <div style="display: flex; flex-direction: column; gap: 8px">
-                  >
                   <a href="/sidik_jari" class="btn btn-ghost btn-full"
                     >🖐️ Kelola Sidik Jari</a
                   >
+                  <button
+                    class="btn btn-ghost btn-full"
+                    onclick="mulaiScanWajah()">
+                    👤 Scan Wajah
+                  </button>
+                  <button
+                    class="btn btn-ghost btn-full"
+                    onclick="mulaiRegisWajah()">
+                    🆕 Regis Wajah Baru
+                  </button>
                   <button
                     class="btn btn-ghost btn-full"
                     onclick="toggleSettings(event)">
@@ -792,11 +899,8 @@
       }
 
       // ── APPLY STATUS TO UI ──────────────────────────
-      // FIX: fungsi terpisah supaya bisa dipanggil dari kirimKunci() juga
       function applyStatus(keadaan) {
-        // Normalisasi: trim dan lowercase untuk perbandingan
         const val = (keadaan || "").trim().toLowerCase();
-        // Brankas terbuka jika value adalah "terbuka" atau "unlock" atau "open"
         const locked = !(
           val === "terbuka" ||
           val === "unlock" ||
@@ -822,7 +926,6 @@
         fetch("/api/status")
           .then((r) => r.json())
           .then((data) => {
-            // Debug: log response supaya bisa dicek di console
             console.log("[status]", data);
             applyStatus(data.keadaan);
           })
@@ -832,12 +935,10 @@
       }
 
       // ── KUNCI / UNLOCK (no reload) ───────────────────
-      // FIX UTAMA: ganti <form method=POST> jadi fetch() supaya tidak reload halaman
       async function kirimKunci(action) {
         const btnUnlock = document.getElementById("btn-unlock");
         const btnLock = document.getElementById("btn-lock");
 
-        // Disable tombol sementara supaya tidak double-klik
         btnUnlock.disabled = true;
         btnLock.disabled = true;
 
@@ -851,7 +952,6 @@
             throw new Error(`HTTP ${resp.status}`);
           }
 
-          // Langsung update UI tanpa tunggu polling
           applyStatus(action === "UNLOCK" ? "terbuka" : "terkunci");
           toast(
             action === "UNLOCK"
@@ -859,15 +959,12 @@
               : "Brankas berhasil dikunci 🔒",
           );
 
-          // Setelah 800ms fetch ulang status dari server untuk konfirmasi
           setTimeout(updateStatus, 800);
-          // Refresh log juga supaya aksi baru muncul
           setTimeout(muatLog, 1000);
         } catch (e) {
           console.error("[kirimKunci] error:", e);
           toast("Gagal mengirim perintah ke perangkat", "⚠️");
         } finally {
-          // Re-enable tombol setelah 1.5 detik
           setTimeout(() => {
             btnUnlock.disabled = false;
             btnLock.disabled = false;
@@ -875,9 +972,62 @@
         }
       }
 
+      // ── SCAN WAJAH ──────────────────────────────────
+      async function mulaiScanWajah() {
+        const btn = document.getElementById("btn-scan-wajah");
+        btn.disabled = true;
+        btn.textContent = "⏳ Scanning...";
+        toast("Memulai scan wajah...", "📷");
+
+        try {
+          const resp = await fetch("/api/wajah/scan", { method: "POST" });
+          const data = await resp.json();
+          if (data.status === "ok") {
+            toast("Wajah terdeteksi! Akses diperiksa.", "✅");
+            setTimeout(updateStatus, 1000);
+            setTimeout(muatLog, 1200);
+          } else {
+            toast(data.message || "Wajah tidak dikenali.", "⛔");
+          }
+        } catch (e) {
+          toast("Gagal menghubungi modul kamera.", "⚠️");
+        } finally {
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = "📷 Scan";
+          }, 2000);
+        }
+      }
+
+      // ── REGIS WAJAH ─────────────────────────────────
+      async function mulaiRegisWajah() {
+        const btn = document.getElementById("btn-regis-wajah");
+        btn.disabled = true;
+        btn.textContent = "⏳ Memproses...";
+        toast("Membuka registrasi wajah baru...", "🆕");
+
+        try {
+          const resp = await fetch("/api/wajah/regis", { method: "POST" });
+          const data = await resp.json();
+          if (data.status === "ok") {
+            toast("Wajah berhasil diregistrasi!", "✅");
+            setTimeout(muatLog, 1000);
+          } else {
+            toast(data.message || "Registrasi gagal.", "⚠️");
+          }
+        } catch (e) {
+          toast("Gagal menghubungi modul kamera.", "⚠️");
+        } finally {
+          setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = "➕ Regis";
+          }, 2000);
+        }
+      }
+
       // ── CHARTS ──────────────────────────────────────
       let actChart, methodChart;
-      let chartReady = false; // ← flag: sudah pernah dibuat belum
+      let chartReady = false;
 
       function initCharts(logs) {
         const days = [],
@@ -913,7 +1063,6 @@
         const labels = ["Wajah", "Sidik Jari", "RFID", "Lainnya"];
 
         if (chartReady) {
-          // Sudah ada chart → update data saja, tanpa animasi
           actChart.data.datasets[0].data = counts;
           actChart.data.datasets[0].backgroundColor = counts.map((v, i) =>
             i === 6 ? "#4F6EF7" : "rgba(79,110,247,.25)",
@@ -922,7 +1071,6 @@
           methodChart.data.datasets[0].data = mData;
           methodChart.update("none");
         } else {
-          // Pertama kali / setelah CTRL+R → buat chart baru dengan animasi normal
           const actCtx = document.getElementById("chart-activity");
           if (actChart) actChart.destroy();
           actChart = new Chart(actCtx, {
@@ -989,10 +1137,9 @@
             },
           });
 
-          chartReady = true; // ← set flag, polling berikutnya tidak animasi lagi
+          chartReady = true;
         }
 
-        // Update legend
         const leg = document.getElementById("chart-legend");
         leg.innerHTML = labels
           .map(
@@ -1159,7 +1306,8 @@
           ]);
           const [wHtml, sHtml] = await Promise.all([wRes.text(), sRes.text()]);
           const wCount = (wHtml.match(/face-card/g) || []).length;
-          document.getElementById("stat-wajah").textContent = wCount || "—";
+          document.getElementById("stat-wajah") &&
+            (document.getElementById("stat-wajah").textContent = wCount || "—");
           const sCount = (sHtml.match(/chip-primary/g) || []).length;
           document.getElementById("stat-jari").textContent =
             Math.max(0, sCount - 1) || "—";

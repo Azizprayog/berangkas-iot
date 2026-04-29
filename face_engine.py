@@ -11,7 +11,7 @@ import numpy as np
 # Konfigurasi
 # ──────────────────────────────────────────
 DB_PATH = "brankas.db"
-UPLOAD_FOLDER = "static/uploads"
+UPLOAD_FOLDER = "static/uploads/foto"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,9 +46,7 @@ def load_known_faces(force_reload: bool = False) -> tuple[list, list]:
         try:
             with sqlite3.connect(DB_PATH) as conn:
                 conn.row_factory = sqlite3.Row
-                rows = conn.execute(
-                    "SELECT nama, foto_path FROM wajah"
-                ).fetchall()
+                rows = conn.execute("SELECT nama, foto_path FROM wajah").fetchall()
         except sqlite3.Error as e:
             logger.error(f"Gagal baca DB: {e}")
             return [], []
@@ -169,7 +167,9 @@ def verify_face(
         return _result(False, None, 0.0, 1.0, "Tidak ada wajah terdeteksi")
     if n > 1:
         logger.info(f"verify_face: {n} wajah terdeteksi, harus tepat 1")
-        return _result(False, None, 0.0, 1.0, f"Terdeteksi {n} wajah — harus tepat 1 orang")
+        return _result(
+            False, None, 0.0, 1.0, f"Terdeteksi {n} wajah — harus tepat 1 orang"
+        )
 
     unknown_enc = unknown_encs[0]
 
@@ -191,7 +191,9 @@ def verify_face(
         logger.info(
             f"MATCH: {best_nama} | distance={best_distance:.4f} | confidence={confidence:.4f}"
         )
-        return _result(True, best_nama, confidence, best_distance, f"Cocok: {best_nama}")
+        return _result(
+            True, best_nama, confidence, best_distance, f"Cocok: {best_nama}"
+        )
     else:
         logger.info(
             f"NO MATCH | closest={best_nama} | distance={best_distance:.4f} | confidence={confidence:.4f}"

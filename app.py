@@ -21,7 +21,7 @@ import numpy as np
 import io
 
 app = Flask(__name__)
-UPLOAD_FOLDER = "static/uploads"
+UPLOAD_FOLDER = "static/uploads/foto"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
@@ -148,7 +148,7 @@ def esp_cam_register():
     return f"OK: {nama} terdaftar", 200
 
 
-@app.route("/scan", methods=["POST"])
+@app.route("/recognize", methods=["POST"])
 def esp_cam_scan():
     """Terima foto JPEG dari ESP32-CAM untuk verifikasi."""
     img_bytes = request.data
