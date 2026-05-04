@@ -22,10 +22,8 @@ UPLOAD_FOLDER = "static/uploads/foto"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ================= STATE =================
-enroll_status = {
-    "status": "idle",
-    "pesan": "Belum mulai"
-}
+enroll_status = {"status": "idle", "pesan": "Belum mulai"}
+
 
 # ================= MQTT HELPER =================
 def publish_verify_result(hasil):
@@ -51,9 +49,6 @@ def index():
 def kontrol_kunci(aksi):
     if aksi in ["LOCK", "UNLOCK"]:
         kunci_brankas(aksi)
-        db = get_db()
-        db.execute("INSERT INTO log_brankas (event) VALUES (?)", (aksi,))
-        db.commit()
         return jsonify({"status": "ok", "aksi": aksi})
     return jsonify({"status": "error"}), 400
 
@@ -142,23 +137,40 @@ def halaman_sidik_jari():
 @app.route("/sidik_jari/tambah", methods=["POST"])
 def tambah_sidik_jari():
     nama = request.form["nama"]
-    finger_id = request.form["finger_id"]
+    finger_id = int(request.form["finger_id"])
 
     db = get_db()
+
+    # 🔥 CEK DUPLIKAT
+    existing = db.execute(
+        "SELECT * FROM sidik_jari WHERE finger_id = ?", (finger_id,)
+    ).fetchone()
+    if existing:
+        return redirect(
+            url_for("halaman_sidik_jari", error=f"ID {finger_id} sudah digunakan!")
+        )
+
+    # kalau aman → insert
     db.execute(
-        "INSERT INTO sidik_jari (nama, finger_id) VALUES (?, ?)",
-        (nama, finger_id)
+        "INSERT INTO sidik_jari (nama, finger_id) VALUES (?, ?)", (nama, finger_id)
     )
     db.commit()
 
-    # update status UI
-    enroll_status["status"] = "proses"
-    enroll_status["pesan"] = f"Tempelkan jari ID {finger_id}"
-
     # kirim ke ESP32
     client.publish("brankas/sidik/enroll", str(finger_id))
+    return redirect(url_for("halaman_sidik_jari", success="Enroll dimulai"))
 
-    return redirect(url_for("halaman_sidik_jari"))
+
+@app.route("/api/log/fingerprint", methods=["POST"])
+def log_fingerprint():
+    data = request.json
+    status = data.get("status", "UNKNOWN")
+
+    db = get_db()
+    db.execute("INSERT INTO log_brankas (event) VALUES (?)", (status,))
+    db.commit()
+
+    return jsonify({"status": "ok"})
 
 
 @app.route("/sidik_jari/hapus/<int:id>", methods=["POST"])
@@ -187,12 +199,31 @@ def api_status():
     return jsonify(status_brankas)
 
 
+# ─── log ─────────────────────────────────────────────────
+
+
+@app.route("/api/log", methods=["GET"])
+def get_log():
+    db = get_db()
+    rows = db.execute("SELECT * FROM log_brankas ORDER BY timestamp DESC").fetchall()
+
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/log/hapus-semua", methods=["POST"])
+def hapus_semua_log():
+    db = get_db()
+    db.execute("DELETE FROM log_brankas")
+    db.commit()
+    return jsonify({"status": "ok"})
+
 # ─── AUTO DELETE LOG ─────────────────────────────────────
 def auto_delete_log():
     while True:
         try:
             db = get_db()
-            db.execute("DELETE FROM log_brankas WHERE timestamp < datetime('now','-7 days')")
+            db.execute(
+                "DELETE FROM log_brankas WHERE timestamp < datetime('now','-7 days')"
+            )
             db.commit()
         except:
             pass

@@ -20,7 +20,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS sidik_jari (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nama TEXT NOT NULL,
-            finger_id INTEGER NOT NULL,
+            finger_id INTEGER NOT NULL UNIQUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS log_brankas (

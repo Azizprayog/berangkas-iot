@@ -18,7 +18,7 @@ import paho.mqtt.client as mqtt
 DB_PATH       = "brankas.db"
 UPLOAD_FOLDER = "static/uploads/foto"
 
-MQTT_BROKER          = "10.42.0.32"
+MQTT_BROKER          = "192.168.1.10"
 MQTT_PORT            = 1883
 MQTT_TOPIC_REG_CMD   = "brankas/wajah/register"
 MQTT_TOPIC_REG_IMAGE = "brankas/wajah/image"

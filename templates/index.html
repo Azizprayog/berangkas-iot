@@ -524,10 +524,10 @@
           <!-- Scan Wajah -->
           <div class="stat-card face-scan">
             <div class="stat-top">
-              <div class="stat-label" style="color:#4f6ef7;">Scan Wajah</div>
+              <div class="stat-label" style="color: #4f6ef7">Scan Wajah</div>
             </div>
             <span class="face-icon-large">👤</span>
-            <div class="stat-footer" style="margin-top: 6px;">
+            <div class="stat-footer" style="margin-top: 6px">
               <button
                 class="face-action-btn scan"
                 id="btn-scan-wajah"
@@ -540,10 +540,10 @@
           <!-- Regis Wajah -->
           <div class="stat-card face-regis">
             <div class="stat-top">
-              <div class="stat-label" style="color:#0f9e76;">Regis Wajah</div>
+              <div class="stat-label" style="color: #0f9e76">Regis Wajah</div>
             </div>
             <span class="face-icon-large">🆕</span>
-            <div class="stat-footer" style="margin-top: 6px;">
+            <div class="stat-footer" style="margin-top: 6px">
               <button
                 class="face-action-btn regis"
                 id="btn-regis-wajah"
@@ -640,7 +640,8 @@
                   <button
                     class="btn btn-sm btn-ghost"
                     id="btn-refresh-log"
-                    title="Refresh Log">
+                    title="Refresh Log"
+                    aria-label="Refresh Log">
                     🔄
                   </button>
                   <button
@@ -1286,18 +1287,15 @@
       }
 
       // ── COUNT STATS ─────────────────────────────────
-    async function loadCounts() {
-      try {
-        const [wRes] = await Promise.all([
-          fetch("/wajah")
-        ]);
-        const [wHtml] = await Promise.all([wRes.text()]);
-        const wCount = (wHtml.match(/face-card/g) || []).length;
-        document.getElementById("stat-wajah") &&
-          (document.getElementById("stat-wajah").textContent = wCount || "—");
-
-      } catch (e) {}
-    }
+      async function loadCounts() {
+        try {
+          const [wRes] = await Promise.all([fetch("/wajah")]);
+          const [wHtml] = await Promise.all([wRes.text()]);
+          const wCount = (wHtml.match(/face-card/g) || []).length;
+          document.getElementById("stat-wajah") &&
+            (document.getElementById("stat-wajah").textContent = wCount || "—");
+        } catch (e) {}
+      }
 
       // ── DEBOUNCED REFRESH ────────────────────────────
       let refreshTimer = null;
@@ -1311,7 +1309,17 @@
         }, 1500);
       }
 
-      // ── INIT ────────────────────────────────────────
+
+       // ── Refresh dekat sampah ────────────────────────────
+
+      document
+        .getElementById("btn-refresh-log")
+        .addEventListener("click", () => {
+          muatLog();
+          toast("Log diperbarui", "🔄");
+        });
+
+      // ── INIT ────────────────────────────────────────script
       document
         .getElementById("btn-refresh")
         .addEventListener("click", refreshAll);

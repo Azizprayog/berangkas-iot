@@ -243,7 +243,10 @@
                 max="127"
                 id="finger-id-input"
                 required />
+
+              <!-- 🔥 HELPER TEXT -->
               <div
+                id="helper-text"
                 style="
                   font-size: 11.5px;
                   color: var(--text-muted);
@@ -251,6 +254,16 @@
                 ">
                 Pilih ID 1–127. Setelah simpan, tempelkan jari ke sensor.
               </div>
+
+              <!-- 🔥 ERROR TEXT -->
+              <div
+                id="error-text"
+                style="
+                  display: none;
+                  font-size: 12px;
+                  color: #f53b57;
+                  margin-top: 5px;
+                "></div>
             </div>
             <div class="modal-footer" style="padding: 16px 0 0; margin: 0">
               <button
@@ -326,6 +339,27 @@
       // ── POLLING STATUS ENROLL ──
       const urlParams = new URLSearchParams(window.location.search);
       let enrollPolling = null;
+
+      // STATUS ERROR DARI ID SIDIK JARI YANG GAGAL ENROLL
+      const errorMsg = urlParams.get("error");
+
+      if (errorMsg) {
+        const errorEl = document.getElementById("error-text");
+        const helperEl = document.getElementById("helper-text");
+        const inputEl = document.getElementById("finger-id-input");
+
+        if (errorEl && helperEl && inputEl) {
+          errorEl.style.display = "block";
+          errorEl.textContent = "❌ " + errorMsg;
+
+          helperEl.style.display = "none";
+
+          inputEl.style.border = "1.5px solid #f53b57";
+
+          // buka modal lagi otomatis
+          openModal("tambah-modal");
+        }
+      }
 
       function showBanner(type, msg, spinner = true) {
         const banner = document.getElementById("enroll-banner");
@@ -411,6 +445,18 @@
           "🔐 Sidik jari sedang dibuat. Mohon tempelkan sidik jari Anda pada sensor.",
         );
       });
+
+      // 🔥 RESET ERROR SAAT USER NGETIK KEMBALI
+      const fingerInput = document.getElementById("finger-id-input");
+
+      if (fingerInput) {
+        fingerInput.addEventListener("input", () => {
+          document.getElementById("error-text").style.display = "none";
+          document.getElementById("helper-text").style.display = "block";
+          fingerInput.style.border = "";
+        });
+      }
+
       setInterval(pollEnrollStatus, 1000);
     </script>
   </body>
