@@ -11,7 +11,7 @@ import io
 from face_engine import verify_face
 
 # ─── MQTT CONFIG ─────────────────────────────────────────
-BROKER = "192.168.1.10"  # Ganti dengan IP MQTT broker Anda
+BROKER = "10.4.3.101"  # Ganti dengan IP MQTT broker Anda
 PORT = 1883
 
 # ─── ESP32 CAM ───────────────────────────────────────────
@@ -124,8 +124,13 @@ def on_message(client, userdata, msg):
 
     # ================= FINGER =================
     elif msg.topic == TOPIC_FINGER:
-        payload = msg.payload.decode().strip().upper()
+        payload = msg.payload.decode().strip()
+
         print(f"[MQTT] Fingerprint event: {payload}")
+
+        if payload.startswith("MATCH:"):
+            finger_id = payload.split(":")[1]
+            print(f"[MATCH] Finger ID = {finger_id}")
 
         # ===== UI ENROLL =====
         if payload == "PROCESS":
