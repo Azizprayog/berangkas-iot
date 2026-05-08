@@ -122,12 +122,6 @@
           <span id="enroll-msg">Menunggu jari...</span>
         </div>
 
-        {% if request.args.get('success') %}
-        <div class="alert alert-success">
-          ✅ {{ request.args.get('success') }}
-        </div>
-        {% endif %}
-
         <div class="section-header">
           <div>
             <div class="page-title">🖐️ Manajemen Sidik Jari</div>
@@ -385,10 +379,8 @@
             const s = data.status;
 
             if (s === "idle") {
-              showBanner(
-                "waiting",
-                "🔐 Sidik jari sedang dibuat. Mohon tempelkan sidik jari Anda pada sensor.",
-              );
+              hideBanner();
+              return;
             }
 
             if (s === "step1") {
@@ -440,6 +432,8 @@
       }
 
       document.getElementById("form-tambah").addEventListener("submit", () => {
+        toast("Tempelkan sidik jari pertama ke sensor...", "🖐️");
+
         showBanner(
           "waiting",
           "🔐 Sidik jari sedang dibuat. Mohon tempelkan sidik jari Anda pada sensor.",
@@ -457,7 +451,24 @@
         });
       }
 
-      setInterval(pollEnrollStatus, 1000);
+      function toast(msg, icon = "🖐️") {
+        const wrap = document.getElementById("toast-container");
+
+        const el = document.createElement("div");
+        el.className = "toast";
+
+        el.innerHTML = `
+    <span>${icon}</span>
+    <span>${msg}</span>
+  `;
+
+        wrap.appendChild(el);
+
+        setTimeout(() => {
+          el.remove();
+        }, 4000);
+      }
     </script>
+    <div id="toast-container"></div>
   </body>
 </html>
