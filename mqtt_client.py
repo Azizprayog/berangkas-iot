@@ -11,7 +11,7 @@ import io
 from face_engine import verify_face
 
 # ─── MQTT CONFIG ─────────────────────────────────────────
-BROKER = "10.4.3.101"  # Ganti dengan IP MQTT broker Anda
+BROKER = "10.4.0.160"  # Ganti dengan IP MQTT broker Anda
 PORT = 1883
 
 # ─── ESP32 CAM ───────────────────────────────────────────
@@ -31,7 +31,10 @@ UPLOAD_FOLDER = "static/uploads/foto"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # ─── SHARED STATE ────────────────────────────────────────
-status_brankas = {"keadaan": "tidak diketahui"}
+status_brankas = {
+    "keadaan": "tidak diketahui",
+    "updated": 0.0
+}
 enroll_status = {"status": "idle", "pesan": ""}
 
 verify_status = {
@@ -108,64 +111,80 @@ def do_verify(client):
 
 # ─── CALLBACKS MQTT ──────────────────────────────────────
 def on_message(client, userdata, msg):
-    print(f"[MQTT] Topic: {msg.topic} → {msg.payload.decode()}")
+    payload = msg.payload.decode().strip()
+
+    print(f"[MQTT] Topic: {msg.topic} → {payload}")
 
     # ================= STATUS =================
     if msg.topic == TOPIC_STATUS:
-        payload = msg.payload.decode().strip().lower()
-        status_brankas["keadaan"] = payload
+        status_brankas["keadaan"] = payload.lower()
+        status_brankas["updated"] = time.time()
 
-        print(f"[MQTT] Status brankas: {payload}")
+        print(f"[STATUS] {payload}")
 
     # ================= RFID =================
     elif msg.topic == TOPIC_RFID:
-        payload = msg.payload.decode().strip().upper()
-        print(f"[MQTT] RFID: {payload}")
+        payload = payload.upper()
+
+        print(f"[RFID] {payload}")
+
+        if payload != "UNKNOWN":
+            kirim_log(f"RFID {payload}")
 
     # ================= FINGER =================
     elif msg.topic == TOPIC_FINGER:
-        payload = msg.payload.decode().strip()
 
-        print(f"[MQTT] Fingerprint event: {payload}")
+        print(f"[FINGER] {payload}")
 
         if payload.startswith("MATCH:"):
             finger_id = payload.split(":")[1]
-            print(f"[MATCH] Finger ID = {finger_id}")
 
-        # ===== UI ENROLL =====
-        if payload == "PROCESS":
-            enroll_status.update(
-                {"status": "proses", "pesan": "🔄 Sidik jari sedang diproses..."}
-            )
+            status_brankas["keadaan"] = "terbuka"
+            status_brankas["updated"] = time.time()
+
+            kirim_log(f"FINGERPRINT ID {finger_id}")
+
+        elif payload == "PROCESS":
+            enroll_status.update({
+                "status": "proses",
+                "pesan": "🔄 Sidik jari sedang diproses..."
+            })
 
         elif payload == "SUCCESS":
-            enroll_status.update({"status": "success", "pesan": "✅ Enroll berhasil"})
-            time.sleep(2)
-            enroll_status.update({"status": "idle", "pesan": ""})
+            enroll_status.update({
+                "status": "success",
+                "pesan": "✅ Sidik berhasil"
+            })
 
         elif payload == "ERROR":
-            enroll_status.update({"status": "error", "pesan": "❌ Enroll gagal"})
+            enroll_status.update({
+                "status": "error",
+                "pesan": "❌ Sidik gagal"
+            })
 
-        elif payload.startswith("ENROLL_STEP1"):
-            enroll_status.update(
-                {"status": "step1", "pesan": "👆 Tempelkan jari (1/2)"}
-            )
-
-        elif payload.startswith("ENROLL_STEP2"):
-            enroll_status.update(
-                {"status": "step2", "pesan": "👆 Tempelkan jari sama (2/2)"}
-            )
-
-    # ================= STATUS RELAY =================
+    # ================= RELAY =================
     elif msg.topic == TOPIC_RELAY:
-        payload = msg.payload.decode().strip().upper()
+        payload = payload.upper()
 
         if payload == "OPEN":
-            kirim_log("UNLOCK")
+            status_brankas["keadaan"] = "terbuka"
+            status_brankas["updated"] = time.time()
 
-    # ================= DELETE FINGERPRINT =================
+            kirim_log("BRANKAS TERBUKA")
+
+            print("[RELAY] TERBUKA")
+
+        elif payload == "CLOSED":
+            status_brankas["keadaan"] = "terkunci"
+            status_brankas["updated"] = time.time()
+
+            kirim_log("BRANKAS TERKUNCI")
+
+            print("[RELAY] TERKUNCI")
+
+    # ================= DELETE =================
     elif msg.topic == TOPIC_DELETE:
-        print(f"[MQTT] Delete ID: {msg.payload.decode()}")
+        print(f"[DELETE] {payload}")
 
 
 def on_connect(client, userdata, flags, rc):
@@ -203,10 +222,7 @@ def start_mqtt():
 # ─── CONTROL FUNCTIONS ───────────────────────────────────
 def kunci_brankas(aksi: str):
     client.publish(TOPIC_KUNCI, aksi)
-    if aksi == "UNLOCK":
-        status_brankas["keadaan"] = "terbuka"
-    elif aksi == "LOCK":
-        status_brankas["keadaan"] = "terkunci"
+
     print(f"[MQTT] {aksi} dikirim")
 
 

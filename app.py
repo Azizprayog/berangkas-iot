@@ -196,6 +196,7 @@ def api_sidik_status():
 # ─── API ─────────────────────────────────────────────────
 @app.route("/api/status")
 def api_status():
+    print("[API STATUS]", status_brankas)
     return jsonify(status_brankas)
 
 
